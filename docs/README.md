@@ -1,9 +1,9 @@
 [![image](https://github.com/user-attachments/assets/202613c2-97b8-4b54-b72c-6f8e110f0ff4)](https://signal.org)
 
-# Signal Desktop Builder For Debian:arm64
+# Signal Desktop Builder For Debian:trixie-arm64
 ### [signal-desktop_7.68.0_arm64.deb](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/builds/release/signal-desktop_7.68.0_arm64.deb)
 
-This project reproducibly builds Signal Desktop for Debian Trixie on Arm64, currently targeting tag `7.68.x`
+This project reproducibly builds Signal Desktop for Debian:trixie-arm64, currently targeting tag `7.68.x`
 
 > Now with an optional update client: [`auto-update-cron.sh`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/master/auto-update-cron.sh)
 
@@ -65,40 +65,45 @@ A. First build and push the upcoming branch:
 ```
 git clone --depth 1 https://github.com/$REPO/Signal-Desktop-Reproducible.git && \
 cd Signal-Desktop-Reproducible && \
-./buildscript.sh -i'.01' -p'8.xx.x' -d'today'
+./buildscript.sh -i'.01' -p'8.x.x' -d'today'
 ```
 ---
 
 B. Then rebuild the current branch and release:
 
 ```
-git clone --depth 1 git@github.com:$REPO/Signal-Desktop-Reproducible.git -b 8.xx.x && \
+git clone --depth 1 git@github.com:$REPO/Signal-Desktop-Reproducible.git -b 8.x.x && \
 cd Signal-Desktop-Reproducible && \
-./buildscript.sh -p'main' -r'8.xx.0'
+./buildscript.sh -p'main' -r'8.x.0'
 ```
 ---
 
 C. To build a past release (8.0.0+) for reproducibility:
 
 ```
-git clone --depth 1 git@github.com:0mniteck/Signal-Desktop-Reproducible.git -b 8.xx.x && \
+git clone --depth 1 git@github.com:0mniteck/Signal-Desktop-Reproducible.git -b 8.x.x && \
 cd Signal-Desktop-Reproducible && \
 ./buildscript.sh
 ```
 
 ## Current Status:‎‎‏‏‎‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎[![CI](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml/badge.svg?branch=7.68.x)](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml)<sub><sup> signalapp/Signal-Desktop</sup></sub>
 
-* [x] Built with [0mniteck/debian-slim:latest](https://hub.docker.com/r/0mniteck)
-* [x] Signal Desktop builds
+# WIP
+* [x] Built with [0mniteck/debian-slim:02-18-2026](https://hub.docker.com/r/0mniteck)
+* [ ] Signal Desktop builds - preparing for v8.x.x
+* [ ] Base image builds and pushes to Docker Hub
+* [ ] Rootless builds
+* [ ] CC'd base images available for amd64
+* [ ] Zero CVE build environment
 * [x] Auto-Update script
-* [x] Reproducible builds
-* [x] Generate/Scan SBOM at buildtime
+* [ ] Reproducible builds
+* [ ] Generate/Scan/Attest SBOM at buildtime
 
 ## Release Cycle:
 
 Currently building upstream releases twice to improve reproducibility/reliability:
 
-`build/release to branch 8.xx.x` --> `test on hardware, document, pull request` --> `build/release to main branch`
+`build/release to branch 8.x.x` --> `test on hardware, document, pull request` --> `build/release to main branch`
 
 ## See also:
 * [The Sovereignty Ephemerality Reproducibility (SER) framework](https://omniteck.com/?p=1104)
