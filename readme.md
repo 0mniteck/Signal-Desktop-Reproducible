@@ -3,7 +3,7 @@
 # Signal Desktop Builder For Debian:arm64
 ### [signal-desktop_7.68.0_arm64.deb](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/builds/release/signal-desktop_7.68.0_arm64.deb)
 
-This project reproducibly builds Signal Desktop for Debian Trixie on ARM64, currently targeting tag `7.68.x`
+This project reproducibly builds Signal Desktop for Debian Trixie on Arm64, currently targeting tag `7.68.x`
 
 > Now with an optional update client: [`auto-update-cron.sh`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/master/auto-update-cron.sh)
 
@@ -11,7 +11,7 @@ This is the latest release: [`builds/release/signal-desktop_7.68.0_arm64.deb`](h
 
 Sha512Sum: [`Results/release.sha512sum`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/release.sha512sum)
 
-> ### Full chain Software Bill of Materials
+> ### Full chain/("Full Scope") SBOMs and Attestations
 >
 > Firmware SBOM's: [`U-Boot:/Results`](https://github.com/0mniteck/U-Boot/tree/v2025.04%2Bv2.12.1%2Bv4.5.0/Results)
 >
