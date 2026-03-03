@@ -65,23 +65,23 @@ A. First build and push the upcoming branch:
 ```
 git clone --depth 1 https://github.com/$REPO/Signal-Desktop-Reproducible.git && \
 cd Signal-Desktop-Reproducible && \
-./buildscript.sh -i'.01' -p'7.xx.x' -d'today'
+./buildscript.sh -i'.01' -p'8.xx.x' -d'today'
 ```
 ---
 
 B. Then rebuild the current branch and release:
 
 ```
-git clone --depth 1 git@github.com:$REPO/Signal-Desktop-Reproducible.git -b 7.xx.x && \
+git clone --depth 1 git@github.com:$REPO/Signal-Desktop-Reproducible.git -b 8.xx.x && \
 cd Signal-Desktop-Reproducible && \
-./buildscript.sh -p'main' -r'7.xx.0'
+./buildscript.sh -p'main' -r'8.xx.0'
 ```
 ---
 
-C. To build a past release (7.90.0+) for reproducibility:
+C. To build a past release (8.0.0+) for reproducibility:
 
 ```
-git clone --depth 1 git@github.com:0mniteck/Signal-Desktop-Reproducible.git -b 7.xx.x && \
+git clone --depth 1 git@github.com:0mniteck/Signal-Desktop-Reproducible.git -b 8.xx.x && \
 cd Signal-Desktop-Reproducible && \
 ./buildscript.sh
 ```
@@ -98,7 +98,7 @@ cd Signal-Desktop-Reproducible && \
 
 Currently building upstream releases twice to improve reproducibility/reliability:
 
-`build/release to branch 7.xx.x` --> `test on hardware, document, pull request` --> `build/release to master branch`
+`build/release to branch 8.xx.x` --> `test on hardware, document, pull request` --> `build/release to main branch`
 
 ## See also:
 * [The Sovereignty Ephemerality Reproducibility (SER) framework](https://omniteck.com/?p=1104)
