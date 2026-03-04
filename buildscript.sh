@@ -447,13 +447,13 @@ quiet() {
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
     chmod +x .pki/local.sh
-    .pki/local.sh \$1 | echo $PKI_DONE || exit 1
+    ./.pki/local.sh \$1 || exit 1
 }
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   mkdir -p $docker_data/.docker && mkdir -p $home/$snap_path/.docker && wait 
   if [[ \"\$(which docker-credential-secretservice)\" == \"\" ]]; then
-    validate.with.pki \"\$cred_helper\" || exit 1 && echo $PKI_DONE
+    validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
     mkdir -p $home/bin && mv $cred_helper_name $home/bin/docker-credential-secretservice
   fi
@@ -564,6 +564,7 @@ mkdir -p Results && pushd Results > /dev/null
   declare | sort >> $run_id:$run_id.env
   mv $docker_data/0:0.env 0:0.env
   docker version > docker.info
+  echo >> docker.info
   docker info >> docker.info 
 popd > /dev/null
 
