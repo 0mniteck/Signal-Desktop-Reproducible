@@ -231,9 +231,9 @@ if [ "$CROSS" = "yes" ]; then
 fi
 
 pushd $docker_data > /dev/null
-  set | sort > 0:0.env
+  set > 0:0.env
   env | sort >> 0:0.env
-  declare | sort >> 0:0.env
+  declare >> 0:0.env
   chown $run_as:$run_as 0:0.env
 popd > /dev/null
 
@@ -455,17 +455,13 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-secretservice)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mkdir -p $home/bin && mv $cred_helper_name $home/bin/docker-credential-secretservice && \
+    mkdir -p $home/bin && mv \$cred_helper_name $home/bin/docker-credential-secretservice && \
     chmod +x $home/bin/docker-credential-secretservice
-  
     echo '{
   \"credsStore\": \"secretservice\"
 }' > $home/$snap_path/.docker/config.json
-    
-    echo '{
-  \"credsStore\": \"secretservice\"
-}' > $docker_data/.docker/config.json
-    installed="which docker-credential-secretservice"
+    cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
+    installed=\"which docker-credential-secretservice\"
     echo installed at: \$(\$installed)
   fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
@@ -478,7 +474,6 @@ systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
 
 source $rootless_path/env-rootless.exp
-which docker-credential-secretservice
 
 quiet \"\$docker info | grep rootless > $rootless_path/rootless.status\"
 if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
@@ -585,7 +580,7 @@ pushd Results > /dev/null
   cat *.image.digest >> readme.md && cat readme.md && echo
 popd > /dev/null
 
-if [[ \"$SKIP_LOGIN\" == \"\" ]]; then
+if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git status && git add -A && git status && read -p '🔐 Press enter to launch pinentry'
   if [ \"\$BRANCH\" != \"\" ]; then
     git commit -a -S -m \"Successful Build of Release \$date_rel\" && git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
@@ -612,6 +607,7 @@ clean_most
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
 rm -r -f $home/$snap_path/* && sync
+
 snap remove docker --purge 2>> $nulled
 quiet networkctl delete docker0
 
