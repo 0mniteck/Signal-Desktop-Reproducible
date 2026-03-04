@@ -455,8 +455,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-secretservice)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mkdir -p $home/bin && mv $cred_helper_name $home/bin/docker-credential-secretservice
-    PATH=\$PATH:$home/bin
+    mkdir -p $home/bin && mv $cred_helper_name $home/bin/docker-credential-secretservice && \
+    chmod +x $home/bin/docker-credential-secretservice
   
     echo '{
   \"credsStore\": \"secretservice\"
@@ -465,7 +465,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo '{
   \"credsStore\": \"secretservice\"
 }' > $docker_data/.docker/config.json
-    which docker-credential-secretservice
+    installed="which docker-credential-secretservice"
+    echo installed at: \$(\$installed)
   fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
   echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
