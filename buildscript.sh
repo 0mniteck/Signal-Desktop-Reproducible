@@ -558,9 +558,9 @@ drop_down() {
 }
 
 mkdir -p Results && pushd Results > /dev/null
-  set | sort > $run_id:$run_id.env
+  set > $run_id:$run_id.env
   env | sort >> $run_id:$run_id.env
-  declare | sort >> $run_id:$run_id.env
+  declare >> $run_id:$run_id.env
   mv $docker_data/0:0.env 0:0.env
   quiet 'docker version > docker.info'
   echo >> docker.info
