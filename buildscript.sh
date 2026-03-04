@@ -606,6 +606,7 @@ quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime
 clean_most
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
+rm -r -f $home/$snap_path/* && sync
 snap remove docker --purge || echo "Failed to remove Docker"
 quiet networkctl delete docker0
 
