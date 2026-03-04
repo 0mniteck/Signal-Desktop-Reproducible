@@ -456,14 +456,18 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
     mkdir -p $home/bin && mv $cred_helper_name $home/bin/docker-credential-secretservice
-  fi
+    PATH=\$PATH:$home/bin
   
-  echo '{
+    echo '{
   \"credsStore\": \"secretservice\"
 }' > $home/$snap_path/.docker/config.json
-
+    
+    echo '{
+  \"credsStore\": \"secretservice\"
+}' > $docker_data/.docker/config.json
+    which docker-credential-secretservice
+  fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
-  ln -f -s $home/$snap_path/.docker/config.json $docker_data/.docker/config.json || exit 1
   echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
   echo && grype login registry-1.docker.io -u \$USERNAME && echo 'Logged in to grype' && echo
 fi
@@ -473,6 +477,7 @@ systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
 
 source $rootless_path/env-rootless.exp
+which docker-credential-secretservice
 
 quiet \"\$docker info | grep rootless > $rootless_path/rootless.status\"
 if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
@@ -513,9 +518,7 @@ unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
-if [[ \"\$submod\" != \"\" ]]; then
-  sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
-fi
+sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
 
 subver() {
   sub_ver=\$1
@@ -563,9 +566,9 @@ mkdir -p Results && pushd Results > /dev/null
   env | sort >> $run_id:$run_id.env
   declare | sort >> $run_id:$run_id.env
   mv $docker_data/0:0.env 0:0.env
-  docker version > docker.info
+  quiet 'docker version > docker.info'
   echo >> docker.info
-  docker info >> docker.info 
+  quiet 'docker info >> docker.info'
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
@@ -608,7 +611,7 @@ clean_most
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
 rm -r -f $home/$snap_path/* && sync
-snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
+snap remove docker --purge 2>> $nulled
 quiet networkctl delete docker0
 
 snap remove grype --purge
