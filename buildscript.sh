@@ -284,11 +284,11 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   }
   git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
-  confirm ' git fetch' && echo 'Starting Git fetch...'
+  confirm ' git fetch' ' (twice)' && echo 'Starting Git fetch...'
   git fetch --unshallow 2>> $nulled
   confirm ' git pull' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
-  confirm ' git submodules' && echo 'Starting Git submodules...'
+  confirm ' git submodules' ' (twice)' && echo 'Starting Git submodules...'
   git submodule add git@.pki:\$REPO/.pki.git
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
@@ -607,7 +607,7 @@ clean_most
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
 rm -r -f $home/$snap_path/* && sync
-snap remove docker --purge || echo "Failed to remove Docker"
+snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 quiet networkctl delete docker0
 
 snap remove grype --purge
@@ -622,4 +622,5 @@ fi
 
 clean_all
 systemctl daemon-reload
+snap remove docker --purge || echo "Failed to remove Docker"
 exit 0
