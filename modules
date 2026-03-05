@@ -2,7 +2,15 @@
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 
 if [ "$INC" != "" ]; then
-  ver_num=$(echo "$last_ver_num + $INC" | bc -l)
+  ver_split=$(echo "$last_ver_num + $INC" | bc -l)
+  ver_maj=$(echo $ver_split | cut -d'.' -f1)
+  ver_min=$(echo $ver_split | cut -d'.' -f2)
+  if [[ "$ver_min" == *00* ]]; then
+    ver_min=0
+  elif [[ "$ver_min" == *0* ]]; then
+    ver_min=$(echo $ver_min | cut -d'0' -f2)
+  fi
+  ver_num=$ver_maj.$ver_min
   sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g docs/_layouts/default.html
   sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g docs/README.md
   sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g readme.md
@@ -61,8 +69,6 @@ popd > /dev/null
 docker run -it --cpus=$(nproc) \
   --network=name=host,\"driver-opt=network=host\" \
   --name $MODULE --platform linux/arm64 \
-  -e PNPM_HOME=/tmp/.pnpm-home \
-  -e NPM_CONFIG_CACHE=/tmp/.npm-cache \
   -e SOURCE_DATE_EPOCH=$source_date_epoch \
    $REPO/$MODULE:$rel_date $TEST $SIGNING_KEY
 
