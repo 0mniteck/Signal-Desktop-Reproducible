@@ -519,11 +519,6 @@ else
   subver $sub_ver
 fi
 
-docker() {
-  echd=\"\$@\"
-  $docker \$echd
-}
-
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   rm -r -f $docker_data/.docker/ $home/$snap_path/.docker/ $home/.docker/ && wait
   mkdir -p $docker_data/.docker $home/$snap_path/.docker $home/.docker && wait
@@ -546,6 +541,11 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   credstat='docker-credential-pass list'
   echo && echo Credentials: \$(\$credstat) && echo
 fi
+
+docker() {
+  echd=\"\$@\"
+  $docker \$echd
+}
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
   docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
