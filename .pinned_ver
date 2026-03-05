@@ -1,5 +1,5 @@
-declare -- cred_helper_sha=2e823ee60c554efc715431bd77180df7de0fb27e6662322bc598d079feddd0d4859de604c038775ba2263a8d29b7ba0a1653991b0b287e72818ec9921fffc121
-declare -- cred_helper_name=docker-credential-secretservice-v0.9.5.linux-arm64
+declare -- cred_helper_sha=e784c37f55c2f3d143a06916169ce8de879894bae45c4e6313daa72af8c75316685ca5a24cf4b7bdb66633e72fd89f7c8e5b3dae81ca6b62b7adec210711b806
+declare -- cred_helper_name=docker-credential-pass-v0.9.5.linux-arm64
 declare -- cred_helper="github.com/docker/docker-credential-helpers/releases/download/v0.9.5/$cred_helper_name"
 declare -- docker_snap_arm64_ver=3380
 declare -- docker_snap_amd64_ver=3377
