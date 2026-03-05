@@ -471,13 +471,14 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     cp $home/$snap_path/.docker/config.json $home/.docker/config.json
     installed='which docker-credential-pass'
     echo Installed at: \$(\$installed)
+    echo PATH=\$PATH
     export -- PATH=\$PATH
   fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
   echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
-  echo && grype login registry-1.docker.io -u \$USERNAME && echo 'Logged in to grype' && echo
+  # echo && # grype login registry-1.docker.io -u \$USERNAME && # echo 'Logged in to grype' && # echo
   credstat='docker-credential-pass list'
-  echo Credentials: \$(\$credstat)
+  echo Credentials: \$(\$credstat) && echo
 fi
 
 sys_ctl_common
