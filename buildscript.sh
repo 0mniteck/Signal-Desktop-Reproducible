@@ -256,6 +256,7 @@ chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
 
 systemctl --user restart gpg-agent.service && wait
 export GPG_TTY=\$(tty)
+gpg2 --quick-set-ownertrust \$USER_ID ultimate
 
 if [[ \"\$ssh_conf\" != *.pki* ]]; then
   echo \"
@@ -280,16 +281,16 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
   ssh-add -l && echo
 
-  confirm() { # \$1 = submod, \$2 = times
-    read -p \"Press enter then 👆 please confirm presence on security token for\$1 git@ssh\$2.\"
+  confirm() { # \$1 = subject
+    read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
   }
   git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
-  confirm ' git fetch' ' (twice)' && echo 'Starting Git fetch...'
+  confirm ' git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
   git fetch --unshallow 2>> $nulled
-  confirm ' git pull' && echo 'Starting Git pull...'
+  confirm ' git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
-  confirm ' git submodules' ' (twice)' && echo 'Starting Git submodules...'
+  confirm ' git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
   git submodule add git@.pki:\$REPO/.pki.git
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
@@ -298,8 +299,11 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
-    echo && echo \"Signing key present\" && echo
+    echo && echo 'Signing key present' && echo
     pass init \$SIGNING_KEY
+    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check
+    confirm ' pass init - pass@gpg'
+    pass show docker-credential-helpers/docker-pass-initialized-check
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo \"Check Yubikey and .identity file\" && echo
@@ -466,11 +470,14 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
     cp $home/$snap_path/.docker/config.json $home/.docker/config.json
     installed=\"which docker-credential-pass\"
-    echo installed at: \$(\$installed)
+    echo Installed at: \$(\$installed)
+    export -- PATH=\$PATH
   fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
   echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
   echo && grype login registry-1.docker.io -u \$USERNAME && echo 'Logged in to grype' && echo
+  credstat="docker-credential-pass list"
+  echo Credentials: \$(\$credstat)
 fi
 
 sys_ctl_common
@@ -595,6 +602,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
 fi
 
+docker-credential-pass erase
 ssh-add -D && eval \"\$(ssh-agent -k)\"
 clean_some
 sys_ctl_common"
