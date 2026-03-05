@@ -2,8 +2,8 @@
 ARG SOURCE=0mniteck/debian-slim
 FROM $SOURCE
 ARG NODE_VERSION NVM_VERSION PNPM_VERSION BRANCH COMMIT SOURCE_DATE_EPOCH
-ENV CI=true SIGNAL_ENV=production USE_SYSTEM_FPM=true NVM_DIR="/usr/local/nvm" NODE_PATH=$NVM_DIR/v$NODE_VERSION/lib/node_modules
-ENV PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
+ENV CI=true SIGNAL_ENV=production USE_SYSTEM_FPM=true NVM_DIR=/usr/local/nvm NODE_PATH=$NVM_DIR/v$NODE_VERSION/lib/node_modules
+ENV PNPM_HOME=/tmp/.pnpm-home NPM_CONFIG_CACHE=/tmp/.npm-cache PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
 
 COPY --link signal-buildscript.sh /usr/local/bin/
 ADD --link https://github.com/nvm-sh/nvm/raw/v$NVM_VERSION/install.sh /
