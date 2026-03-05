@@ -6,8 +6,9 @@ declare -- IDENTITY_FILE=.ssh/$NAME
 declare -- PKI_ID_FILE=.ssh/.pki
 declare -- PROJECT=Signal-Desktop-Reproducible
 declare -- SIGSTORE_USR=tiger-varsity-alto@duck.com
+declare -- USER_ID=10482171+0mniteck@users.noreply.github.com
 declare -- SIGNING_KEY=42E2DDF1E31B370F8BFFEE03287EE837E6ED2DD3
-git config --global user.email 10482171+0mniteck@users.noreply.github.com
+git config --global user.email $USER_ID
 git config --global user.name 'Shant Patrick Tchatalbachian'
 git config --global user.signingkey $SIGNING_KEY
 if [[ "$SKIP_LOGIN" == "" ]]; then
