@@ -451,7 +451,8 @@ validate.with.pki() { # \$1 = full_url.TDL/.../[file]
 }
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  mkdir -p $docker_data/.docker && mkdir -p $home/$snap_path/.docker && wait 
+  rm -r -f $docker_data/.docker/ $home/$snap_path/.docker/ $home/.docker/ && wait
+  mkdir -p $docker_data/.docker $home/$snap_path/.docker $home/.docker && wait
   if [[ \"\$(which docker-credential-secretservice)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
@@ -461,6 +462,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   \"credsStore\": \"secretservice\"
 }' > $home/$snap_path/.docker/config.json
     cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
+    cp $home/$snap_path/.docker/config.json $home/.docker/config.json
     installed=\"which docker-credential-secretservice\"
     echo installed at: \$(\$installed)
   fi
@@ -472,7 +474,6 @@ fi
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
-
 source $rootless_path/env-rootless.exp
 
 quiet \"\$docker info | grep rootless > $rootless_path/rootless.status\"
@@ -508,6 +509,7 @@ else
     source_date_epoch=1
   fi
 fi
+echo
 SOURCE_DATE_EPOCH=\$source_date_epoch
 
 unset rel_date date_rel rel_ver sub_ver
@@ -562,6 +564,7 @@ mkdir -p Results && pushd Results > /dev/null
   env | sort >> $run_id:$run_id.env
   declare >> $run_id:$run_id.env
   mv $docker_data/0:0.env 0:0.env
+  
   quiet 'docker version > docker.info'
   echo >> docker.info
   quiet 'docker info >> docker.info'
