@@ -456,31 +456,6 @@ validate.with.pki() { # \$1 = full_url.TDL/.../[file]
     ./.pki/local.sh \$1 || exit 1
 }
 
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  rm -r -f $docker_data/.docker/ $home/$snap_path/.docker/ $home/.docker/ && wait
-  mkdir -p $docker_data/.docker $home/$snap_path/.docker $home/.docker && wait
-  if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
-    validate.with.pki \"\$cred_helper\" || exit 1
-    echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mkdir -p $home/bin && mv \$cred_helper_name $home/bin/docker-credential-pass && \
-    chmod +x $home/bin/docker-credential-pass
-    echo '{
-  \"credsStore\": \"pass\"
-}' > $home/$snap_path/.docker/config.json
-    cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
-    cp $home/$snap_path/.docker/config.json $home/.docker/config.json
-    installed='which docker-credential-pass'
-    echo Installed at: \$(\$installed)
-    echo PATH=\$PATH
-    export -- PATH=\$PATH
-  fi
-  echo && read -p '🔐 Press enter to start docker login.' && docker login && \
-  echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
-  # echo && # grype login registry-1.docker.io -u \$USERNAME && # echo 'Logged in to grype' && # echo
-  credstat='docker-credential-pass list'
-  echo Credentials: \$(\$credstat) && echo
-fi
-
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
@@ -548,6 +523,29 @@ docker() {
   echd=\"\$@\"
   $docker \$echd
 }
+
+if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  rm -r -f $docker_data/.docker/ $home/$snap_path/.docker/ $home/.docker/ && wait
+  mkdir -p $docker_data/.docker $home/$snap_path/.docker $home/.docker && wait
+  if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
+    validate.with.pki \"\$cred_helper\" || exit 1
+    echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
+    mkdir -p $home/bin && mv \$cred_helper_name $home/bin/docker-credential-pass && \
+    chmod +x $home/bin/docker-credential-pass
+    echo '{
+  \"credsStore\": \"pass\"
+}' > $home/$snap_path/.docker/config.json
+    cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
+    cp $home/$snap_path/.docker/config.json $home/.docker/config.json
+    installed='which docker-credential-pass'
+    echo Installed at: \$(\$installed)
+    export -- PATH=\$PATH
+  fi
+  echo && read -p '🔐 Press enter to start docker login.' && docker login && \
+  echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
+  credstat='docker-credential-pass list'
+  echo && echo Credentials: \$(\$credstat) && echo
+fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
   docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
