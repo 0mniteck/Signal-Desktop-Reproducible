@@ -87,8 +87,10 @@ fi
 source .pinned_ver
 if [[ "$(uname -m)" == "aarch64" ]]; then
   snap_path=snap/docker/$docker_snap_arm64_ver
+  docker_snap_ver=$docker_snap_arm64_ver
 elif [[ "$(uname -m)" == "x86_64" ]]; then
   snap_path=snap/docker/$docker_snap_amd64_ver
+  docker_snap_ver=$docker_snap_amd64_ver
 else
   echo 'Unknown Architecture '$(uname -m)
   exit 1
@@ -147,8 +149,7 @@ clean_all
 
 apt-get -qq update && apt-get -qq upgrade -y
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ \
-                                                                    jq+ libsecret-1-0+ libsecret-common+ libsecret-tools+ \
-                                                                    parted+ pkexec+ rootlesskit+ scdaemon+ \
+                                                                    jq+ parted+ pass+ pkexec+ rootlesskit+ scdaemon+ \
                                                                     slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ \
                                                                     \
@@ -172,17 +173,7 @@ fi
 
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
 quiet networkctl delete docker0
-
-if [[ "$(uname -m)" == "aarch64" ]]; then
-  snap install docker --revision=$docker_snap_arm64_ver && wait || echo "Failed to install Docker"
-  quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
-elif [[ "$(uname -m)" == "x86_64" ]]; then
-  snap install docker --revision=$docker_snap_amd64_ver && wait || echo "Failed to install Docker"
-else
-  echo 'Unknown Architecture '$(uname -m)
-  exit 1
-fi
-echo
+snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker" && echo
 
 snap disconnect docker:privileged >> $nulled
 snap disconnect docker:docker-daemon >> $nulled
@@ -191,6 +182,7 @@ snap disconnect docker:firewall-control >> $nulled
 snap stop docker && wait
 systemctl reset-failed && wait
 systemctl stop snap.docker.* --all && wait
+quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
 quiet networkctl delete docker0
 systemctl daemon-reload
@@ -256,13 +248,14 @@ mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config
 ssh_conf=\$(<\$HOME/.ssh/config)
 
-systemctl --user restart gpg-agent.service && wait
-export GPG_TTY=\$(tty)
-
 source .identity
 source .pinned_ver
+
 chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
 chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
+
+systemctl --user restart gpg-agent.service && wait
+export GPG_TTY=\$(tty)
 
 if [[ \"\$ssh_conf\" != *.pki* ]]; then
   echo \"
@@ -306,6 +299,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo && echo \"Signing key present\" && echo
+    pass init \$SIGNING_KEY
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo \"Check Yubikey and .identity file\" && echo
@@ -461,17 +455,17 @@ validate.with.pki() { # \$1 = full_url.TDL/.../[file]
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   rm -r -f $docker_data/.docker/ $home/$snap_path/.docker/ $home/.docker/ && wait
   mkdir -p $docker_data/.docker $home/$snap_path/.docker $home/.docker && wait
-  if [[ \"\$(which docker-credential-secretservice)\" == \"\" ]]; then
+  if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mkdir -p $home/bin && mv \$cred_helper_name $home/bin/docker-credential-secretservice && \
-    chmod +x $home/bin/docker-credential-secretservice
+    mkdir -p $home/bin && mv \$cred_helper_name $home/bin/docker-credential-pass && \
+    chmod +x $home/bin/docker-credential-pass
     echo '{
-  \"credsStore\": \"secretservice\"
+  \"credsStore\": \"pass\"
 }' > $home/$snap_path/.docker/config.json
     cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
     cp $home/$snap_path/.docker/config.json $home/.docker/config.json
-    installed=\"which docker-credential-secretservice\"
+    installed=\"which docker-credential-pass\"
     echo installed at: \$(\$installed)
   fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
