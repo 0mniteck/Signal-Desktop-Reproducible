@@ -12,4 +12,4 @@ declare -- nvm_ver=0.40.4
 declare -- pnpm_ver=10.18.1
 declare -- last_rel_date=02-17-2026
 declare -- last_ver_num=7.68
-declare -- commit=8f7a4e2
+declare -- commit=ea7f9853e8457d414afe0560e8c8c55d343a8062
