@@ -84,19 +84,27 @@ if [ "$TEST" = "yes" ]; then
   chown root:root $nulled
 fi
 
+source .pinned_ver
+if [[ "$(uname -m)" == "aarch64" ]]; then
+  snap_path=snap/docker/$docker_snap_arm64_ver
+elif [[ "$(uname -m)" == "x86_64" ]]; then
+  snap_path=snap/docker/$docker_snap_amd64_ver
+else
+  echo 'Unknown Architecture '$(uname -m)
+  exit 1
+fi
+
 home=$HOME
 run_dir=/run/user/$run_id
 data_dir=$home/.local/share
 sysusr_path=$data_dir/systemd/user
 rootless_path=$data_dir/rootless
 docker_data=$data_dir/docker
-snap_path=snap/docker/current
 docker_path=/$snap_path/bin
 docker=$docker_path/docker
 systemd_service=/etc/systemd/system/snap.docker.dockerd.service
 sysusr_service=$sysusr_path/docker.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
-source .pinned_ver
 
 sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
