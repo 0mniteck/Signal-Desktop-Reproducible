@@ -286,11 +286,11 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   }
   git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
-  confirm ' git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
+  confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
   git fetch --unshallow 2>> $nulled
-  confirm ' git pull - git@ssh' && echo 'Starting Git pull...'
+  confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
-  confirm ' git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
+  confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
   git submodule add git@.pki:\$REPO/.pki.git
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
@@ -302,7 +302,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo && echo 'Signing key present' && echo
     pass init \$SIGNING_KEY
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check
-    confirm ' pass init - pass@gpg'
+    confirm 'pass init - pass@gpg'
     pass show docker-credential-helpers/docker-pass-initialized-check
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
@@ -469,14 +469,14 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
 }' > $home/$snap_path/.docker/config.json
     cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
     cp $home/$snap_path/.docker/config.json $home/.docker/config.json
-    installed=\"which docker-credential-pass\"
+    installed='which docker-credential-pass'
     echo Installed at: \$(\$installed)
     export -- PATH=\$PATH
   fi
   echo && read -p '🔐 Press enter to start docker login.' && docker login && \
   echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
   echo && grype login registry-1.docker.io -u \$USERNAME && echo 'Logged in to grype' && echo
-  credstat="docker-credential-pass list"
+  credstat='docker-credential-pass list'
   echo Credentials: \$(\$credstat)
 fi
 
