@@ -302,7 +302,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo && echo 'Signing key present' && echo
     pass init \$SIGNING_KEY
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check
-    confirm 'pass init - pass@gpg'
+    confirm 'pass init - pinentry@gpg'
     pass show docker-credential-helpers/docker-pass-initialized-check
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
