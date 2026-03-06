@@ -175,6 +175,7 @@ snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
 quiet networkctl delete docker0
 snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker" && echo
 
+snap disconnect docker:support >> $nulled
 snap disconnect docker:privileged >> $nulled
 snap disconnect docker:docker-daemon >> $nulled
 snap disconnect docker:firewall-control >> $nulled
