@@ -148,13 +148,13 @@ systemd_ctl_common() {
 }
 
 unmount() {
-  quiet snap disable docker
-  quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2)
+  quiet snap disable docker && sleep 1
+  quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2) && \
   rm -r -f $docker_data/* && sync
   quiet umount $docker_data && sleep 1
   quiet systemd-cryptsetup detach Luks-Signal && sleep 1
   quiet dmsetup remove /dev/mapper/Luks-Signal && sleep 1
-  rm -r -f $docker_data/
+  rm -r -f $docker_data/ && sync
 }
 
 clean_all
@@ -170,13 +170,13 @@ if [ "$MOUNT" != "" ]; then
 fi
 
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
-snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker"
-snap install syft --classic && wait
+snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
+snap install syft --classic
 snap install grype --classic && echo
 
 for d in docker-daemon firewall-control privileged support ; do
   snap disconnect docker:$d >> $nulled && \
-  echo "Removing snap plug docker:"$d || exit 1
+  echo "Removing plug docker:"$d || exit 1
 done && sleep 1 && echo
 
 systemd_ctl_common
@@ -184,7 +184,7 @@ quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
-groupadd -f docker && wait; usermod -aG docker $run_as && wait
+# groupadd -f docker && wait; usermod -aG docker $run_as && wait
 
 mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
@@ -608,12 +608,12 @@ quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl unmask snap.docker.dockerd --runtime --now
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 quiet networkctl delete docker0
-delgroup docker
+# delgroup docker
 systemd_ctl_common
 
-quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
+quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
 rm -r -f $home/$snap_path/* && sync
-snap remove docker --purge 2>> $nulled
+snap remove docker --purge 2>> $nulled && wait
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove grype --purge
 snap remove syft --purge
