@@ -157,8 +157,8 @@ unmount() {
 clean_all
 
 apt-get -qq update && apt-get -qq upgrade -y
-apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ \
-                                                                    jq+ parted+ pass+ pkexec+ rootlesskit+ scdaemon+ \
+apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ jq+ \
+                                                                    parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ scdaemon+ \
                                                                     slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ \
                                                                     docker- docker.io- docker-ce- docker-ce-cli-
@@ -181,7 +181,7 @@ quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 
-mkdir -p /$plugins_path && \
+mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
 ln -f -s /$snap_path/$plugins_path/docker-compose /$plugins_path/docker-compose >> $nulled || exit 1
 
@@ -206,6 +206,7 @@ set_facl="setfacl -m u:$run_as:rw /dev/bus/usb/$BUS/$DEVICE"
 quiet $set_facl || quiet $set_facl || exit 1
 
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
+
 if [ "$MOUNT" != "" ]; then
   systemd-cryptsetup attach Luks-Signal /dev/$MOUNT && sleep 1 && echo
   mount /dev/mapper/Luks-Signal $docker_data && sleep 1
@@ -301,7 +302,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo -e '\nSigning key present\n'
     pass init \$SIGNING_KEY
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    confirm 'pass show - pinentry-curses@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check || exit 1
+    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -457,8 +458,7 @@ docker() {
 }
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
-    chmod +x .pki/local.sh 
-    ./.pki/local.sh \$1 || exit 1
+    chmod +x .pki/local.sh && ./.pki/local.sh \$1 || exit 1
 }
 
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
@@ -578,11 +578,11 @@ pushd Results > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  git status && git add -A && git status && read -p '🔐 Press enter to launch pinentry-ncurses'
+  git status && git add -A && git status && read -p '🔐 Press enter to launch pinentry'
   if [ \"\$BRANCH\" != \"\" ]; then
     git commit -a -S -m \"Successful Build of Release \$date_rel\" && git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
     if [ \"\$TAG\" != \"\" ]; then
-      git tag -a \"\$TAG\" -S -m \"Tagged Release \$TAG\" && sleep 5 && git push origin \"refs/tags/\$TAG\"
+      git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && git push origin \"refs/tags/\$TAG\"
     fi
   fi
 fi
