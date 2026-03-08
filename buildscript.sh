@@ -184,7 +184,7 @@ quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
-groupadd -f docker && wait && \
+groupadd -f docker && wait
 usermod -aG docker $run_as && wait
 
 mkdir -p /$plugins_path && wait
@@ -297,14 +297,14 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
-    echo -e '\nSigning key present\n\n'
+    echo -e '\nSigning key present\n'
     pass init \$SIGNING_KEY
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check
     confirm 'pass init - pinentry@gpg'
     pass show docker-credential-helpers/docker-pass-initialized-check
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
-    echo -e '\nCheck Yubikey and .identity file\n\n'
+    echo -e '\nCheck Yubikey and .identity file\n'
     lsusb && ls -la /dev/hid* && gpg-card list - openpgp
     systemctl --user status gpg-agent* --all --no-pager
     ls -la $home/.gnupg && ls -la $home/.password-store
@@ -570,8 +570,7 @@ mkdir -p Results && pushd Results > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  chmod -x modules
-  source modules || drop_down
+  chmod -x modules && source modules || drop_down
 else
   drop_down
 fi
@@ -619,6 +618,7 @@ snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove grype --purge
 snap remove syft --purge
 clean_all
+
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
