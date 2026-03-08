@@ -300,9 +300,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
-    pass init \$SIGNING_KEY && echo
-    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
+    # pass init \$SIGNING_KEY && echo
+    # printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
+    # confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -546,7 +546,12 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
+  snap run --shell docker.docker -c \"
+  PATH=\$PATH:$home/bin ;
+  pass init \$SIGNING_KEY && echo ;
+  printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check ;
+  docker login ;
+  echo DONE ; \" && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
