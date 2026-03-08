@@ -133,29 +133,18 @@ clean_most() {
   rm -r -f $run_dir/containerd/
   rm -r -f $run_dir/docker*
   rm -r -f $run_dir/runc/
-  rm -r -f $docker_data*
+  rm -r -f $data_dir/docker/
 }
 
 clean_all() {
   rm -r -f /var/snap/docker/
   rm -r -f $home/snap/docker/
   rm -r -f $home/.docker/
+  rm -r -f $home/docker/
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
   clean_most
 }
-
-clean_all
-
-apt-get -qq update && apt-get -qq upgrade -y
-apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ \
-                                                                    jq+ parted+ pass+ pkexec+ rootlesskit+ scdaemon+ \
-                                                                    slirp4netns+ snapd+ systemd-container+ \
-                                                                    systemd-cryptsetup+ uidmap+ \
-                                                                    \
-                                                                    docker- docker.io- docker-ce- docker-ce-cli-
-snap install syft --classic && wait
-snap install grype --classic && wait
 
 unmount() {
     quiet snap disable docker
@@ -167,18 +156,26 @@ unmount() {
     rm -r -f $docker_data/
 }
 
+clean_all
+
+apt-get -qq update && apt-get -qq upgrade -y
+apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ \
+                                                                    jq+ parted+ pass+ pkexec+ rootlesskit+ scdaemon+ \
+                                                                    slirp4netns+ snapd+ systemd-container+ \
+                                                                    systemd-cryptsetup+ uidmap+ \
+                                                                    docker- docker.io- docker-ce- docker-ce-cli-
 if [ "$MOUNT" != "" ]; then
     unmount
 fi
 
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
-quiet networkctl delete docker0
-snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker" && echo
+snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker" && wait
+snap install syft --classic && wait
+snap install grype --classic && echo
 
-snap disconnect docker:support >> $nulled
-snap disconnect docker:privileged >> $nulled
-snap disconnect docker:docker-daemon >> $nulled
-snap disconnect docker:firewall-control >> $nulled
+for d in docker-daemon firewall-control privileged support ; do
+  snap disconnect docker:$d >> $nulled
+done
 
 snap stop docker && wait
 systemctl reset-failed && wait
@@ -187,6 +184,10 @@ quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
 quiet networkctl delete docker0
 systemctl daemon-reload
+
+groupadd -f docker && wait
+usermod -aG docker $run_as && wait
+mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 
 clean_most
 
@@ -213,10 +214,6 @@ if [ "$MOUNT" != "" ]; then
   mount /dev/mapper/Luks-Signal $docker_data && sleep 1
   rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
 fi
-
-groupadd -f docker && wait
-usermod -aG docker $run_as && wait
-mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 
 mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
@@ -310,12 +307,13 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo \"Check Yubikey and .identity file\" && echo
     lsusb && ls -la /dev/hid* && gpg-card list - openpgp
     systemctl --user status gpg-agent* --all --no-pager
-    ls -la $home/.gnupg
+    ls -la $home/.gnupg && ls -la $home/.password-store
     exit 1
   fi
 fi
 
 clean_some() {
+  rm -r -f /home/$run_as/docker/
   rm -r -f /home/$run_as/.docker/
   rm -r -f /home/$run_as/.local/share/rootless*
   rm -r -f /home/$run_as/.local/share/systemd/
@@ -327,7 +325,7 @@ mkdir -p $rootless_path/tmp && wait
 > $rootless_path.sh && > $rootless_path/env-docker && > $rootless_path/env-rootless && chmod +x $rootless_path.sh && wait
 
 cat >> $rootless_path.sh << __EOF
-  #!/bin/bash
+  #!/usr/bin/env -S - bash --norc --noprofile
   $debug
   mkdir -p $rootless_path/tmp && wait
   > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
@@ -337,10 +335,10 @@ cat >> $rootless_path.sh << __EOF
   echo \"docker=$docker
   HOME=$home
   XDG_CONFIG_HOME=$home
-  X2DG_RUNTIME_DIR=/run/user/$run_id
+  XDG_RUNTIME_DIR=$run_dir
   DOCKER_TMPDIR=$docker_data/tmp
-  DOCKER_CONFIG=$docker_data/.docker
-  DOCKER_HOST=unix:///run/user/$run_id/docker.sock
+  DOCKER_CONFIG=$home/docker
+  DOCKER_HOST=unix://$run_dir/docker.sock
   BUILDX_METADATA_PROVENANCE=max
   BUILDX_METADATA_WARNINGS=1
   BUILDKIT_PROGRESS=tty
@@ -452,6 +450,11 @@ quiet() {
   script -a -q -c \"\$echt\" $nulled >> $nulled
 }
 
+docker() {
+  echd=\"\$@\"
+  $docker \$echd
+}
+
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
     chmod +x .pki/local.sh
     ./.pki/local.sh \$1 || exit 1
@@ -521,8 +524,7 @@ else
 fi
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  rm -r -f $docker_data/.docker/ $home/$snap_path/.docker/ $home/.docker/ && wait
-  mkdir -p $docker_data/.docker $home/$snap_path/.docker $home/.docker && wait
+  rm -r -f $home/docker/ && wait && mkdir -p $home/docker && wait
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
@@ -530,22 +532,15 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     chmod +x $home/bin/docker-credential-pass
     echo '{
   \"credsStore\": \"pass\"
-}' > $home/$snap_path/.docker/config.json
-    cp $home/$snap_path/.docker/config.json $docker_data/.docker/config.json
-    cp $home/$snap_path/.docker/config.json $home/.docker/config.json
+}' > $home/docker/config.json
     installed='which docker-credential-pass'
     echo Installed at: \$(\$installed)
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.' && echo && \
-  snap run --shell docker.docker -c 'PATH=\$PATH:/$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
+  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
   echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
 fi
-
-docker() {
-  echd=\"\$@\"
-  $docker \$echd
-}
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
   docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
@@ -613,27 +608,23 @@ if [ "$MOUNT" != "" ]; then
     unmount
 fi
 
-quiet systemctl unmask snap.docker.dockerd --runtime
-quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime
-clean_most
+clean_all
+quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime --now
+quiet systemctl unmask snap.docker.dockerd --runtime --now
+sed -i "s|:/home/root:|:/root:|" /etc/passwd
+quiet networkctl delete docker0
+systemctl daemon-reload
+delgroup docker
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
 rm -r -f $home/$snap_path/* && sync
-
 snap remove docker --purge 2>> $nulled
-quiet networkctl delete docker0
-
+snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove grype --purge
 snap remove syft --purge
-
-sed -i "s|:/home/root:|:/root:|" /etc/passwd
-delgroup docker
+clean_all
 
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
-
-clean_all
-systemctl daemon-reload
-snap remove docker --purge || echo "Failed to remove Docker"
 exit 0
