@@ -12,7 +12,6 @@ git config --global user.email $USER_ID
 git config --global user.name 'Shant Patrick Tchatalbachian'
 git config --global user.signingkey $SIGNING_KEY
 if [[ "$SKIP_LOGIN" == "" ]]; then
-
 echo '-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQENBGUR6+QBCADbwEILdDDXamhAQbL7KlgFzoP3NI8+I2bCHHAUPYbpaCax0plM
