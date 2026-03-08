@@ -51,7 +51,7 @@ $debug
 run_id=$8
 run_as=$(id -u $run_id -n)
 run_home=/home/$run_as
-export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$run_home/bin
+export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$run_home/bin TERM=xterm-256color
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -300,9 +300,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
-    pass init \$SIGNING_KEY
+    pass init \$SIGNING_KEY && echo
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check || exit 1
+    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -332,6 +332,7 @@ cat >> $rootless_path.sh << __EOF
   > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
   rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
   env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
+  
   echo \"docker=$docker
   HOME=$home
   XDG_CONFIG_HOME=$home
@@ -348,6 +349,7 @@ cat >> $rootless_path.sh << __EOF
   SYFT_CACHE_DIR=$docker_data/syft
   GRYPE_DB_CACHE_DIR=$docker_data/grype
   PATH=$path:$docker_path\" >> $rootless_path/env-rootless
+  
   sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
   \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
   --userland-proxy-path=$docker_path/docker-proxy --init-path=$docker_path/docker-init \
@@ -458,7 +460,7 @@ docker() {
 }
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
-    chmod +x .pki/local.sh && ./.pki/local.sh \$1 || exit 1
+  chmod +x .pki/local.sh && ./.pki/local.sh \$1 || exit 1
 }
 
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
@@ -469,13 +471,14 @@ sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
 source $rootless_path/env-rootless.exp
-
 quiet \"$docker info | grep rootless > $rootless_path/rootless.status\"
+
 if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
   echo -e 'Rootless Docker Failed\n' && exit 1
 else
-  echo -e 'Rootless Docker Started\n'
-  echo -e 'Rootless Docker Started\n' > $rootless_path/rootless.status
+  rootless='Rootless Docker Started\n'
+  echo -e $rootless
+  echo -e $rootless > $rootless_path/rootless.status
 fi
 
 source_date_epoch=1
@@ -538,9 +541,11 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
 }' > $home/docker/config.json && \
     installed='which docker-credential-pass' && \
     echo Installed at: \$(\$installed) || exit 1
+    cp \$(which pass) $home/bin/pass && \
+    echo Installed at: $home/bin/pass || exit 1
   fi
   credstat='docker-credential-pass list'
-  echo && read -p '🔐 Press enter to start docker login.' && echo
+  echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
@@ -578,7 +583,7 @@ pushd Results > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  git status && git add -A && git status && read -p '🔐 Press enter to launch pinentry'
+  git status && git add -A && git status && confirm 'git commit - git@ssh'
   if [ \"\$BRANCH\" != \"\" ]; then
     git commit -a -S -m \"Successful Build of Release \$date_rel\" && git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
     if [ \"\$TAG\" != \"\" ]; then
