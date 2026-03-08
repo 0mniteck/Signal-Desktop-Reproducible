@@ -53,6 +53,9 @@ run_id=$8
 run_as=$(id -u $run_id -n)
 run_home=/home/$run_as
 
+export -- HOME=$run_home
+export -- PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
+
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
     echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n" && exit 1
@@ -86,9 +89,6 @@ elif [[ "$(uname -m)" == "x86_64" ]]; then
 else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
-
-export -- HOME=$run_home
-export -- PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
 
 home=$HOME; path=$PATH
 run_dir=/run/user/$run_id
