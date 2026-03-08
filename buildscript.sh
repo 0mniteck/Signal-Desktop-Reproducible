@@ -177,7 +177,7 @@ snap install grype --classic && echo
 for d in docker-daemon firewall-control privileged support ; do
   snap disconnect docker:$d >> $nulled && \
   echo "Removing snap plug docker:"$d. || exit 1
-done
+done && sleep 1 && echo
 
 systemd_ctl_common
 quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
