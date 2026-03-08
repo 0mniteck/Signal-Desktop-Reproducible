@@ -184,8 +184,7 @@ quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
-groupadd -f docker && wait
-usermod -aG docker $run_as && wait
+groupadd -f docker && wait; usermod -aG docker $run_as && wait
 
 mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
@@ -228,10 +227,11 @@ if [ "$CROSS" = "yes" ]; then
 fi
 
 pushd $docker_data > /dev/null
-  set > 0:0.env
-  env | sort >> 0:0.env
-  declare >> 0:0.env
-  chown $run_as:$run_as 0:0.env
+  save_id=0:0.env
+  set > $save_id
+  env | sort >> $save_id
+  declare >> $save_id
+  chown $run_as:$run_as $save_id
 popd > /dev/null
 
 machinectl shell $run_as@ /usr/bin/env - /bin/bash --norc --noprofile -c "
@@ -326,6 +326,8 @@ mkdir -p $rootless_path/tmp && wait && \
 mkdir -p $sysusr_path && wait && \
 cp $systemd_service $sysusr_service || exit 1
 
+mkdir -p $home/docker && mkdir -p $docker_data/syft && mkdir -p $docker_data/grype
+
 cat >> $rootless_path.sh << __EOF
   #!/usr/bin/env -S - bash --norc --noprofile
   $debug
@@ -364,7 +366,6 @@ drop_down() {
   PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
 }
 
-mkdir -p $docker_data/syft && mkdir -p $docker_data/grype
 scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalogers directory', \$3 = Platform(amd64/arm64), \$4 = Attest Tag
   src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
   if [[ \"\$3\" != \"\" ]]; then
@@ -530,8 +531,6 @@ else
   subver \$sub_ver
 fi
 
-rm -r -f $home/docker/ && wait && mkdir -p $home/docker && wait
-
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
@@ -560,9 +559,10 @@ fi
 echo
 
 mkdir -p Results && pushd Results > /dev/null
-  set > $run_id:$run_id.env
-  env | sort >> $run_id:$run_id.env
-  declare >> $run_id:$run_id.env
+  save_id=$run_id:$run_id.env
+  set > $save_id
+  env | sort >> $save_id
+  declare >> $save_id
   mv $docker_data/0:0.env 0:0.env
   quiet 'docker version > docker.info'
   echo >> docker.info
