@@ -53,29 +53,21 @@ run_id=$8
 run_as=$(id -u $run_id -n)
 run_home=/home/$run_as
 
-export -- HOME=$run_home
-export -- PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
-path=$PATH
-
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
-    echo && echo "DO NOT run with escalated priviledges!"
-    echo "Script will Use: ~\$ 'pkexec --keep-cwd ./buildscript.sh'" && echo
-    exit 1
+    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n" && exit 1
   else
-    echo && echo "Pkexec is required for installation steps"
-    echo "Using: ~\$ 'pkexec --keep-cwd ./buildscript.sh'" && echo
+    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n"
     runm="exec pkexec --keep-cwd '$0' '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$(id -u)'"
     if [[ "$(which asciinema)" != "" ]]; then
       repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
       project=$(cat .identity | grep PROJECT= | cut -d'=' -f2)
       rel_date=$(date -d "$(date)" +%m-%d-%Y)
-      mkdir -p $run_home/.casts/$repo
+      mkdir -p $run_home/.casts/$repo && \
       exec asciinema rec --overwrite -t "$repo/$project:$rel_date" $HOME/.casts/$repo/$project:$rel_date.cast -c "$runm"
     else
       $runm
     fi
-    exit 0
   fi
 fi
 
@@ -92,11 +84,13 @@ elif [[ "$(uname -m)" == "x86_64" ]]; then
   snap_path=snap/docker/$docker_snap_amd64_ver
   docker_snap_ver=$docker_snap_amd64_ver
 else
-  echo 'Unknown Architecture '$(uname -m)
-  exit 1
+  echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
-home=$HOME
+export -- HOME=$run_home
+export -- PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
+
+home=$HOME; path=$PATH
 run_dir=/run/user/$run_id
 data_dir=$home/.local/share
 sysusr_path=$data_dir/systemd/user
@@ -123,37 +117,44 @@ quiet() {
 clean_most() {
   rm -r -f /home/root/*
   rm -r -f /root/snap/docker/
-  rm -r -f /run/snap.docker/
-  rm -r -f /run/containerd/
-  rm -r -f /run/docker*
-  rm -r -f /run/runc/
-  rm -r -f /usr/libexec/docker/
-  rm -r -f /var/lib/snapd/cache/*
-  rm -r -f $home/$snap_path/*
+  rm -r -f $data_dir/docker/
   rm -r -f $run_dir/containerd/
   rm -r -f $run_dir/docker*
   rm -r -f $run_dir/runc/
-  rm -r -f $data_dir/docker/
+  rm -r -f /run/containerd/
+  rm -r -f /run/docker*
+  rm -r -f /run/runc/
+  rm -r -f /run/snap.docker/
 }
 
 clean_all() {
-  rm -r -f /var/snap/docker/
+  rm -r -f $home/$snap_path/*
   rm -r -f $home/snap/docker/
-  rm -r -f $home/.docker/
   rm -r -f $home/docker/
+  rm -r -f $home/.docker/
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
   clean_most
+  rm -r -f /var/snap/docker/
+  rm -r -f /usr/libexec/docker/
+  rm -r -f /var/lib/snapd/cache/*
+}
+
+systemd_ctl_common() {
+  snap stop docker && wait
+  systemctl daemon-reload && wait
+  systemctl reset-failed && wait
+  systemctl stop snap.docker.* --all && wait
 }
 
 unmount() {
-    quiet snap disable docker
-    quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2)
-    rm -r -f $docker_data/* && sync
-    quiet umount $docker_data && sleep 1
-    quiet systemd-cryptsetup detach Luks-Signal && sleep 1
-    quiet dmsetup remove /dev/mapper/Luks-Signal && sleep 1
-    rm -r -f $docker_data/
+  quiet snap disable docker
+  quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2)
+  rm -r -f $docker_data/* && sync
+  quiet umount $docker_data && sleep 1
+  quiet systemd-cryptsetup detach Luks-Signal && sleep 1
+  quiet dmsetup remove /dev/mapper/Luks-Signal && sleep 1
+  rm -r -f $docker_data/
 }
 
 clean_all
@@ -174,20 +175,21 @@ snap install syft --classic && wait
 snap install grype --classic && echo
 
 for d in docker-daemon firewall-control privileged support ; do
-  snap disconnect docker:$d >> $nulled
+  snap disconnect docker:$d >> $nulled && \
+  echo "Removing snap plug docker:"$d. || exit 1
 done
 
-snap stop docker && wait
-systemctl reset-failed && wait
-systemctl stop snap.docker.* --all && wait
+systemd_ctl_common
 quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
-quiet networkctl delete docker0
-systemctl daemon-reload
-
-groupadd -f docker && wait
-usermod -aG docker $run_as && wait
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
+quiet networkctl delete docker0
+groupadd -f docker && wait && \
+usermod -aG docker $run_as && wait
+
+mkdir -p /$plugins_path && wait
+ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
+ln -f -s /$snap_path/$plugins_path/docker-compose /$plugins_path/docker-compose >> $nulled || exit 1
 
 clean_most
 
@@ -202,23 +204,20 @@ if [[ "$SKIP_LOGIN" == "" ]]; then
     printf "\r🔐 Please insert yubikey...\033[K"
   done && sleep 1 && echo
 fi
+
 quiet chown $run_as:$run_as /dev/hidraw*
-DEVICE=$(lsusb -d 1050:0407 | grep -o Device.... - | grep -o [0-9][0-9][0-9])
-BUS=$(lsusb -d 1050:0407 | grep -o Bus.... - | grep -o [0-9][0-9][0-9])
+DEVICE=$(lsusb -d 1050: | grep -o Device.... - | grep -o [0-9][0-9][0-9])
+BUS=$(lsusb -d 1050: | grep -o Bus.... - | grep -o [0-9][0-9][0-9])
 set_facl="setfacl -m u:$run_as:rw /dev/bus/usb/$BUS/$DEVICE"
 quiet $set_facl || quiet $set_facl || exit 1
 
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
+
 if [ "$MOUNT" != "" ]; then
   systemd-cryptsetup attach Luks-Signal /dev/$MOUNT && sleep 1 && echo
   mount /dev/mapper/Luks-Signal $docker_data && sleep 1
   rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
 fi
-
-mkdir -p /$plugins_path && wait
-ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
-ln -f -s /$snap_path/$plugins_path/docker-compose /$plugins_path/docker-compose >> $nulled || exit 1
-
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 else
@@ -235,12 +234,13 @@ pushd $docker_data > /dev/null
   chown $run_as:$run_as 0:0.env
 popd > /dev/null
 
-machinectl shell $run_as@ /bin/bash --norc --noprofile -c "
+machinectl shell $run_as@ /usr/bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $(echo $PWD)
+
 HOME=$HOME; CROSS=$CROSS; EPOCH=$EPOCH; INC=$INC
 MOUNT=$MOUNT; BRANCH=$BRANCH; TAG=$TAG; TEST=$TEST
-SKIP_LOGIN=$SKIP_LOGIN; PUSH=$PUSH; PATH=$path
+SKIP_LOGIN=$SKIP_LOGIN; PUSH=$PUSH; PATH=$PATH
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config
@@ -297,14 +297,14 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
-    echo && echo 'Signing key present' && echo
+    echo -e '\nSigning key present\n\n'
     pass init \$SIGNING_KEY
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check
     confirm 'pass init - pinentry@gpg'
     pass show docker-credential-helpers/docker-pass-initialized-check
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
-    echo \"Check Yubikey and .identity file\" && echo
+    echo -e '\nCheck Yubikey and .identity file\n\n'
     lsusb && ls -la /dev/hid* && gpg-card list - openpgp
     systemctl --user status gpg-agent* --all --no-pager
     ls -la $home/.gnupg && ls -la $home/.password-store
@@ -321,8 +321,11 @@ clean_some() {
 
 clean_some
 
-mkdir -p $rootless_path/tmp && wait
-> $rootless_path.sh && > $rootless_path/env-docker && > $rootless_path/env-rootless && chmod +x $rootless_path.sh && wait
+mkdir -p $sysusr_path && wait && \
+cp $systemd_service $sysusr_service || exit 1
+
+mkdir -p $rootless_path/tmp && wait && \
+> $rootless_path.sh && > $rootless_path/env-docker && > $rootless_path/env-rootless && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/usr/bin/env -S - bash --norc --noprofile
@@ -331,7 +334,6 @@ cat >> $rootless_path.sh << __EOF
   > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
   rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
   env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
-  
   echo \"docker=$docker
   HOME=$home
   XDG_CONFIG_HOME=$home
@@ -346,19 +348,24 @@ cat >> $rootless_path.sh << __EOF
   SYFT_CACHE_DIR=$docker_data/syft
   GRYPE_DB_CACHE_DIR=$docker_data/grype
   PATH=\$PATH:$docker_path\" >> $rootless_path/env-rootless
-  
   sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
   \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
   --userland-proxy-path=$docker_path/docker-proxy --init-path=$docker_path/docker-init \
   --feature cdi=false --group docker) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
 __EOF
 
-mkdir -p $sysusr_path && wait && \
-cp $systemd_service $sysusr_service || exit 1
-
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service
 sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$data_dir/rootless.sh\'|\" $sysusr_service
+
+drop_down() {
+  read -p 'Dropping down to shell; run source modules; or issue docker commands rootlessly;'
+  env - bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
+  echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
+  echo \"echo 'Dropped down to shell. exit when done, or press ctrl+d';echo; \
+  PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
+  PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
+}
 
 mkdir -p $docker_data/syft && mkdir -p $docker_data/grype
 scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalogers directory', \$3 = Platform(amd64/arm64), \$4 = Attest Tag
@@ -465,12 +472,12 @@ systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
 source $rootless_path/env-rootless.exp
 
-quiet \"\$docker info | grep rootless > $rootless_path/rootless.status\"
+quiet \"$docker info | grep rootless > $rootless_path/rootless.status\"
 if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
-  echo \"Rootless Docker Failed\" && echo && exit 1
+  echo -e 'Rootless Docker Failed\n' && exit 1
 else
-  echo \"Rootless Docker Started\" && echo && sleep 5
-  echo \"Rootless Docker Started\" > $rootless_path/rootless.status
+  echo -e 'Rootless Docker Started\n'
+  echo -e 'Rootless Docker Started\n' > $rootless_path/rootless.status
 fi
 
 source_date_epoch=1
@@ -523,8 +530,8 @@ else
   subver $sub_ver
 fi
 
+rm -r -f $home/docker/ && wait && mkdir -p $home/docker && wait
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  rm -r -f $home/docker/ && wait && mkdir -p $home/docker && wait
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
@@ -539,35 +546,24 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.' && echo && \
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
-  echo && syft login registry-1.docker.io -u \$USERNAME && echo 'Logged in to syft' && echo
+  echo && syft login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to syft\n' || exit 1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
   docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
-  echo
 elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
   docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
-  echo
 else
   echo 'Unknown Architecture '\$(uname -m)
   exit 1
 fi
-
-drop_down() {
-  read -p 'Dropping down to shell; run source modules; or issue docker commands rootlessly'
-  env - bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
-    echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
-    echo \"echo 'Dropped down to shell. exit when done, or press ctrl+d';echo; \
-    PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
-    PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
-}
+echo
 
 mkdir -p Results && pushd Results > /dev/null
   set > $run_id:$run_id.env
   env | sort >> $run_id:$run_id.env
   declare >> $run_id:$run_id.env
   mv $docker_data/0:0.env 0:0.env
-  
   quiet 'docker version > docker.info'
   echo >> docker.info
   quiet 'docker info >> docker.info'
@@ -613,8 +609,8 @@ quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl unmask snap.docker.dockerd --runtime --now
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 quiet networkctl delete docker0
-systemctl daemon-reload
 delgroup docker
+systemd_ctl_common
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
 rm -r -f $home/$snap_path/* && sync
@@ -623,7 +619,6 @@ snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove grype --purge
 snap remove syft --purge
 clean_all
-
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
