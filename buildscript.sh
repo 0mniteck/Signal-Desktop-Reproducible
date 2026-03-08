@@ -551,6 +551,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   pass init \$SIGNING_KEY && echo ;
   printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check ;
   docker login ;
+  read -p Test_Here ;
   echo DONE ; \" && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
