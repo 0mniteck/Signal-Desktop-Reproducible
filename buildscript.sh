@@ -67,7 +67,7 @@ if [[ "$run_id" == "" ]]; then
       project=$(cat .identity | grep PROJECT= | cut -d'=' -f2)
       rel_date=$(date -d "$(date)" +%m-%d-%Y)
       mkdir -p $run_home/.casts/$repo && \
-      exec asciinema rec --overwrite -t "$repo/$project:$rel_date" $HOME/.casts/$repo/$project:$rel_date.cast -c "$runm"
+      exec asciinema rec --overwrite -t "$repo/$project:$rel_date" $run_home/.casts/$repo/$project:$rel_date.cast -c "$runm"
     else
       $runm
     fi
@@ -170,13 +170,13 @@ if [ "$MOUNT" != "" ]; then
 fi
 
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
-snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker" && wait
+snap install docker --revision=$docker_snap_ver && wait || echo "Failed to install Docker"
 snap install syft --classic && wait
 snap install grype --classic && echo
 
 for d in docker-daemon firewall-control privileged support ; do
   snap disconnect docker:$d >> $nulled && \
-  echo "Removing snap plug docker:"$d. || exit 1
+  echo "Removing snap plug docker:"$d || exit 1
 done && sleep 1 && echo
 
 systemd_ctl_common
@@ -241,6 +241,8 @@ cd $(echo $PWD)
 HOME=$HOME; CROSS=$CROSS; EPOCH=$EPOCH; INC=$INC
 MOUNT=$MOUNT; BRANCH=$BRANCH; TAG=$TAG; TEST=$TEST
 SKIP_LOGIN=$SKIP_LOGIN; PUSH=$PUSH; PATH=$PATH
+DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
+XDG_RUNTIME_DIR=$run_dir
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config
@@ -278,7 +280,6 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
   ssh-add -l && echo
-
   confirm() { # \$1 = subject
     read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
   }
@@ -293,9 +294,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
   git submodule --quiet foreach \"git remote remove origin && git remote add origin git@\$name:\$REPO/\$name.git\"
-  
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
-  
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
     pass init \$SIGNING_KEY
@@ -321,11 +320,11 @@ clean_some() {
 
 clean_some
 
-mkdir -p $sysusr_path && wait && \
-cp $systemd_service $sysusr_service || exit 1
-
 mkdir -p $rootless_path/tmp && wait && \
 > $rootless_path.sh && > $rootless_path/env-docker && > $rootless_path/env-rootless && chmod +x $rootless_path.sh || exit 1
+
+mkdir -p $sysusr_path && wait && \
+cp $systemd_service $sysusr_service || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/usr/bin/env -S - bash --norc --noprofile
@@ -338,25 +337,23 @@ cat >> $rootless_path.sh << __EOF
   HOME=$home
   XDG_CONFIG_HOME=$home
   XDG_RUNTIME_DIR=$run_dir
+  DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
   DOCKER_TMPDIR=$docker_data/tmp
   DOCKER_CONFIG=$home/docker
   DOCKER_HOST=unix://$run_dir/docker.sock
   BUILDX_METADATA_PROVENANCE=max
   BUILDX_METADATA_WARNINGS=1
   BUILDKIT_PROGRESS=tty
+  NO_COLOR=true
   SOURCE_DATE_EPOCH=\$source_date_epoch
   SYFT_CACHE_DIR=$docker_data/syft
   GRYPE_DB_CACHE_DIR=$docker_data/grype
-  PATH=\$PATH:$docker_path\" >> $rootless_path/env-rootless
+  PATH=$path:$docker_path\" >> $rootless_path/env-rootless
   sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
   \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
   --userland-proxy-path=$docker_path/docker-proxy --init-path=$docker_path/docker-init \
-  --feature cdi=false --group docker) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
+  --feature cdi=false --group $run_as) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
 __EOF
-
-sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
-sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service
-sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$data_dir/rootless.sh\'|\" $sysusr_service
 
 drop_down() {
   read -p 'Dropping down to shell; run source modules; or issue docker commands rootlessly;'
@@ -467,6 +464,10 @@ validate.with.pki() { # \$1 = full_url.TDL/.../[file]
     ./.pki/local.sh \$1 || exit 1
 }
 
+sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
+sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service
+sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$data_dir/rootless.sh\'|\" $sysusr_service
+
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
@@ -505,8 +506,7 @@ else
     source_date_epoch=1
   fi
 fi
-echo
-SOURCE_DATE_EPOCH=\$source_date_epoch
+echo && SOURCE_DATE_EPOCH=\$source_date_epoch
 
 unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
@@ -524,13 +524,14 @@ subver() {
 if [[ \"\$rel_ver\" -lt 1 ]]; then
   wait
 elif [[ \"\$sub_ver\" -ge 1 ]]; then
-  subver $sub_ver
+  subver \$sub_ver
 else
   sub_ver=1
-  subver $sub_ver
+  subver \$sub_ver
 fi
 
 rm -r -f $home/docker/ && wait && mkdir -p $home/docker && wait
+
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
@@ -546,7 +547,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.' && echo && \
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
-  echo && syft login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to syft\n' || exit 1
+  syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
@@ -554,8 +555,7 @@ if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
 elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
   docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
 else
-  echo 'Unknown Architecture '\$(uname -m)
-  exit 1
+  echo 'Unknown Architecture '\$(uname -m) && exit 1
 fi
 echo
 
