@@ -48,12 +48,10 @@ if [ "$CROSS" = "" ]; then
 fi
 
 $debug
-
 run_id=$8
 run_as=$(id -u $run_id -n)
 run_home=/home/$run_as
-
-export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
+export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$run_home/bin
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -89,8 +87,8 @@ else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
-home=$HOME; path=$PATH
 run_dir=/run/user/$run_id
+home=$HOME; path=$PATH; RUN_DIR=$run_dir
 data_dir=$home/.local/share
 sysusr_path=$data_dir/systemd/user
 rootless_path=$data_dir/rootless
@@ -174,8 +172,7 @@ snap install syft --classic
 snap install grype --classic && echo
 
 for d in docker-daemon firewall-control privileged support ; do
-  snap disconnect docker:$d >> $nulled && \
-  echo "Removing plug docker:"$d || exit 1
+  snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && sleep 1 && echo
 
 systemd_ctl_common
@@ -183,7 +180,6 @@ quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
-# groupadd -f docker && wait; usermod -aG docker $run_as && wait
 
 mkdir -p /$plugins_path && \
 ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
@@ -210,7 +206,6 @@ set_facl="setfacl -m u:$run_as:rw /dev/bus/usb/$BUS/$DEVICE"
 quiet $set_facl || quiet $set_facl || exit 1
 
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
-
 if [ "$MOUNT" != "" ]; then
   systemd-cryptsetup attach Luks-Signal /dev/$MOUNT && sleep 1 && echo
   mount /dev/mapper/Luks-Signal $docker_data && sleep 1
@@ -237,27 +232,39 @@ machinectl shell $run_as@ /usr/bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $(echo $PWD)
 
-export -- HOME=$HOME CROSS=$CROSS EPOCH=$EPOCH INC=$INC \
-MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
-SKIP_LOGIN=$SKIP_LOGIN PUSH=$PUSH PATH=$PATH \
-DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus \
-XDG_RUNTIME_DIR=$run_dir
-
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config
-ssh_conf=\$(<\$HOME/.ssh/config)
+
+export -- \
+SKIP_LOGIN=$SKIP_LOGIN PUSH=$PUSH PATH=$PATH \
+HOME=$HOME CROSS=$CROSS EPOCH=$EPOCH INC=$INC \
+MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
+DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
+XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/usr/bin/tty) \
+SSH_CONF=\$(<$HOME/.ssh/config)
+
+eval \"\$(ssh-agent -s)\" && wait
+systemctl --user restart gpg-agent.service && wait
 
 source .identity
 source .pinned_ver
 
 chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
 chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
-
-systemctl --user restart gpg-agent.service && wait
-export GPG_TTY=\$(tty)
 gpg2 --quick-set-ownertrust \$USER_ID ultimate
 
-if [[ \"\$ssh_conf\" != *.pki* ]]; then
+clean_some() {
+  rm -r -f /home/$run_as/docker/
+  rm -r -f /home/$run_as/.docker/
+  rm -r -f /home/$run_as/.local/share/rootless*
+  rm -r -f /home/$run_as/.local/share/systemd/
+}
+
+confirm() { # \$1 = subject
+  read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
+}
+
+if [[ \"\$SSH_CONF\" != *.pki* ]]; then
   echo \"
 Host .pki
   Hostname github.com
@@ -265,7 +272,7 @@ Host .pki
   IdentitiesOnly yes\" >> $home/.ssh/config
 fi
 
-if [[ \"\$ssh_conf\" != *\$PROJECT* ]]; then
+if [[ \"\$SSH_CONF\" != *\$PROJECT* ]]; then
   echo \"
 Host \$PROJECT
   Hostname github.com
@@ -274,14 +281,10 @@ Host \$PROJECT
 fi
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  eval \"\$(ssh-agent -s)\" && wait
   ssh -T git@github.com 2>> $nulled
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
   ssh-add -l && echo
-  confirm() { # \$1 = subject
-    read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
-  }
   git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
   confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
@@ -297,9 +300,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
     pass init \$SIGNING_KEY
-    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check
-    confirm 'pass init - pinentry@gpg'
-    pass show docker-credential-helpers/docker-pass-initialized-check
+    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
+    confirm 'pass show - pinentry-curses@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -310,22 +312,17 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
 fi
 
-clean_some() {
-  rm -r -f /home/$run_as/docker/
-  rm -r -f /home/$run_as/.docker/
-  rm -r -f /home/$run_as/.local/share/rootless*
-  rm -r -f /home/$run_as/.local/share/systemd/
-}
-
 clean_some
 
-mkdir -p $rootless_path/tmp && wait && \
-> $rootless_path.sh && > $rootless_path/env-docker && > $rootless_path/env-rootless && chmod +x $rootless_path.sh || exit 1
+mkdir -p $rootless_path/tmp && wait && > $rootless_path.sh && \
+> $rootless_path/env-docker && > $rootless_path/env-rootless && \
+chmod +x $rootless_path.sh || exit 1
+
+mkdir -p $home/bin && mkdir -p $home/docker && \
+mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
 
 mkdir -p $sysusr_path && wait && \
 cp $systemd_service $sysusr_service || exit 1
-
-mkdir -p $home/docker && mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/usr/bin/env -S - bash --norc --noprofile
@@ -460,7 +457,7 @@ docker() {
 }
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
-    chmod +x .pki/local.sh
+    chmod +x .pki/local.sh 
     ./.pki/local.sh \$1 || exit 1
 }
 
@@ -534,13 +531,13 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mkdir -p $home/bin && mv \$cred_helper_name $home/bin/docker-credential-pass && \
-    chmod +x $home/bin/docker-credential-pass
+    mv \$cred_helper_name $home/bin/docker-credential-pass || exit 1
+    chmod +x $home/bin/docker-credential-pass && \
     echo '{
   \"credsStore\": \"pass\"
-}' > $home/docker/config.json
-    installed='which docker-credential-pass'
-    echo Installed at: \$(\$installed)
+}' > $home/docker/config.json && \
+    installed='which docker-credential-pass' && \
+    echo Installed at: \$(\$installed) || exit 1
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.' && echo
@@ -569,9 +566,9 @@ mkdir -p Results && pushd Results > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  chmod -x modules && source modules || drop_down
+  chmod -x modules && source modules || drop_down || exit 1
 else
-  drop_down
+  drop_down || exit 1
 fi
 
 pushd Results > /dev/null
@@ -581,11 +578,11 @@ pushd Results > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  git status && git add -A && git status && read -p '🔐 Press enter to launch pinentry'
+  git status && git add -A && git status && read -p '🔐 Press enter to launch pinentry-ncurses'
   if [ \"\$BRANCH\" != \"\" ]; then
     git commit -a -S -m \"Successful Build of Release \$date_rel\" && git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
     if [ \"\$TAG\" != \"\" ]; then
-      git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && git push origin \"refs/tags/\$TAG\"
+      git tag -a \"\$TAG\" -S -m \"Tagged Release \$TAG\" && sleep 5 && git push origin \"refs/tags/\$TAG\"
     fi
   fi
 fi
@@ -607,7 +604,6 @@ quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime --now
 quiet systemctl unmask snap.docker.dockerd --runtime --now
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 quiet networkctl delete docker0
-# delgroup docker
 systemd_ctl_common
 
 quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
