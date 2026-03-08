@@ -156,7 +156,7 @@ unmount() {
 
 clean_all
 
-apt-get -qq update && apt-get -qq upgrade -y
+apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ jq+ \
                                                                     parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ scdaemon+ \
                                                                     slirp4netns+ snapd+ systemd-container+ \
@@ -171,7 +171,7 @@ snap install docker --revision=$docker_snap_ver || echo "Failed to install Docke
 snap install syft --classic
 snap install grype --classic && echo
 
-for d in docker-daemon firewall-control privileged support ; do
+for d in docker-daemon firewall-control opengl privileged support ; do
   snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && sleep 1 && echo
 
