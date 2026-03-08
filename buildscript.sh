@@ -242,7 +242,7 @@ HOME=$HOME CROSS=$CROSS EPOCH=$EPOCH INC=$INC \
 MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
 DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
 XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/usr/bin/tty) \
-SSH_CONF=\$(<$HOME/.ssh/config)
+SSH_CONF=\$(<$HOME/.ssh/config) TERM=xterm-256color \
 
 eval \"\$(ssh-agent -s)\" && wait
 systemctl --user restart gpg-agent.service && wait
