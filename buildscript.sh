@@ -53,8 +53,7 @@ run_id=$8
 run_as=$(id -u $run_id -n)
 run_home=/home/$run_as
 
-export -- HOME=$run_home
-export -- PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
+export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$HOME/bin
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -186,7 +185,7 @@ mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 # groupadd -f docker && wait; usermod -aG docker $run_as && wait
 
-mkdir -p /$plugins_path && wait
+mkdir -p /$plugins_path && \
 ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
 ln -f -s /$snap_path/$plugins_path/docker-compose /$plugins_path/docker-compose >> $nulled || exit 1
 
@@ -238,10 +237,10 @@ machinectl shell $run_as@ /usr/bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $(echo $PWD)
 
-HOME=$HOME; CROSS=$CROSS; EPOCH=$EPOCH; INC=$INC
-MOUNT=$MOUNT; BRANCH=$BRANCH; TAG=$TAG; TEST=$TEST
-SKIP_LOGIN=$SKIP_LOGIN; PUSH=$PUSH; PATH=$PATH
-DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
+export -- HOME=$HOME CROSS=$CROSS EPOCH=$EPOCH INC=$INC \
+MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
+SKIP_LOGIN=$SKIP_LOGIN PUSH=$PUSH PATH=$PATH \
+DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus \
 XDG_RUNTIME_DIR=$run_dir
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
@@ -326,7 +325,7 @@ mkdir -p $rootless_path/tmp && wait && \
 mkdir -p $sysusr_path && wait && \
 cp $systemd_service $sysusr_service || exit 1
 
-mkdir -p $home/docker && mkdir -p $docker_data/syft && mkdir -p $docker_data/grype
+mkdir -p $home/docker && mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/usr/bin/env -S - bash --norc --noprofile
@@ -544,7 +543,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo Installed at: \$(\$installed)
   fi
   credstat='docker-credential-pass list'
-  echo && read -p '🔐 Press enter to start docker login.' && echo && \
+  echo && read -p '🔐 Press enter to start docker login.' && echo
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
