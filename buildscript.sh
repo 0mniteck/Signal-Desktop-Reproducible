@@ -303,9 +303,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     mkdir -p $home/.password-store && mkdir -p $home/$snap_path/.password-store || exit 1
     pass init \$SIGNING_KEY && echo
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
+    # confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
-    read -p TEST_HERE1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -355,8 +354,7 @@ cat >> $rootless_path.sh << __EOF
   \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
   --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
   --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
-  --exec-root $run_dir/docker --pidfile $run_dir/docker.pid --userns-remap $run_as:$run_as \
-  ) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
+  --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
 __EOF
 
 drop_down() {
@@ -554,15 +552,15 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store && \
   echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker || exit 1
-  read -p TEST_HERE2
+  read -p TEST_HERE1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
   grype login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to grype\n' || exit 1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-  docker run --privileged --userns=host --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
+  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
 elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-  docker run --privileged --userns=host --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
+  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
 else
   echo 'Unknown Architecture '\$(uname -m) && exit 1
 fi
@@ -578,7 +576,7 @@ mkdir -p Results && pushd Results > /dev/null
   echo >> docker.info
   quiet 'docker info >> docker.info'
 popd > /dev/null
-
+read -p TEST_HERE2
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   chmod -x modules && source modules || drop_down || exit 1
 else
