@@ -300,11 +300,12 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
+    mkdir -p $home/.password-store && mkdir -p $home/$snap_path/.password-store || exit 1
     pass init \$SIGNING_KEY && echo
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
     confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
-    mkdir -p $home/$snap_path/.password-store && \
     mv $home/.password-store/* $home/$snap_path/.password-store || exit 1
+    read -p TEST_HERE1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -321,7 +322,7 @@ mkdir -p $rootless_path/tmp && wait && > $rootless_path.sh && \
 > $rootless_path/env-docker && > $rootless_path/env-rootless && \
 chmod +x $rootless_path.sh || exit 1
 
-mkdir -p $home/bin && mkdir -p $home/docker && \
+mkdir -p $home/bin && mkdir -p $home/docker && mkdir -p $home/.docker && \
 mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
 
 mkdir -p $sysusr_path && wait && \
@@ -549,10 +550,11 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' || exit 1
-  mkdir -p $home/.password-store && mv $home/$snap_path/.password-store/* $home/.password-store && \
-  echo Credentials: \$(\$credstat) || exit 1
-  mkdir -p $home/.docker && cp $home/docker/* $home/.docker || exit 1
+  mv $home/$snap_path/.password-store/* $home/.password-store && \
+  echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker || exit 1
+  read -p TEST_HERE2
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
+  grype login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to grype\n' || exit 1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
