@@ -300,9 +300,10 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
-    # pass init \$SIGNING_KEY && echo
-    # printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    # confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
+    pass init \$SIGNING_KEY && echo
+    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
+    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
+    mv $home/.password-store $home/$snap_path/.password-store
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -477,8 +478,8 @@ if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
   echo -e 'Rootless Docker Failed\n' && exit 1
 else
   rootless='Rootless Docker Started\n'
-  echo -e $rootless
-  echo -e $rootless > $rootless_path/rootless.status
+  echo -e \$rootless
+  echo -e \$rootless > $rootless_path/rootless.status
 fi
 
 source_date_epoch=1
@@ -543,16 +544,13 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo Installed at: \$(\$installed) || exit 1
     cp \$(which pass) $home/bin/pass && \
     echo Installed at: $home/bin/pass || exit 1
+    cp \$(which gpg) $home/bin/gpg && \
+    echo Installed at: $home/bin/gpg || exit 1
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c \"
-  PATH=\$PATH:$home/bin ;
-  pass init \$SIGNING_KEY && echo ;
-  printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check ;
-  docker login ;
-  read -p Test_Here ;
-  echo DONE ; \" && echo Credentials: \$(\$credstat) || exit 1
+  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' || exit 1
+  mv $home/$snap_path/.password-store $home/.password-store && echo Credentials: \$(\$credstat)
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
