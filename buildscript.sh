@@ -303,7 +303,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     pass init \$SIGNING_KEY && echo
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
     confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
-    mv $home/.password-store $home/$snap_path/.password-store
+    mkdir -p $home/$snap_path/.password-store && \
+    mv $home/.password-store/* $home/$snap_path/.password-store || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -333,7 +334,6 @@ cat >> $rootless_path.sh << __EOF
   > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
   rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
   env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
-  
   echo \"docker=$docker
   HOME=$home
   XDG_CONFIG_HOME=$home
@@ -350,7 +350,6 @@ cat >> $rootless_path.sh << __EOF
   SYFT_CACHE_DIR=$docker_data/syft
   GRYPE_DB_CACHE_DIR=$docker_data/grype
   PATH=$path:$docker_path\" >> $rootless_path/env-rootless
-  
   sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
   \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
   --userland-proxy-path=$docker_path/docker-proxy --init-path=$docker_path/docker-init \
@@ -550,7 +549,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' || exit 1
-  mv $home/$snap_path/.password-store $home/.password-store && echo Credentials: \$(\$credstat)
+  mkdir -p $home/.password-store && mv $home/$snap_path/.password-store/* $home/.password-store && \
+  echo Credentials: \$(\$credstat) || exit 1
+  mkdir -p $home/.docker && cp $home/docker/* $home/.docker || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
