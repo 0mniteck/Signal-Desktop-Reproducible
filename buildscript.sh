@@ -35,14 +35,17 @@ else
   SKIP_LOGIN="yes"
   nulled=/tmp/nulled.log
   debug="set -x"
-  echo "Cross Compile: $CROSS"
-  echo "Increment: $INC"
-  echo "Override Source Epoch: $EPOCH"
-  echo "Mount /dev/: $MOUNT"
-  echo "Push to Branch: $BRANCH"
-  echo "Tag Release: $TAG"
-  echo "Run Tests: $TEST"
+  echo "
+  Cross Compile: $CROSS
+  Increment: $INC
+  Override Source Epoch: $EPOCH
+  Mount: /dev/$MOUNT
+  Push to Branch: $BRANCH
+  Tag Release: $TAG
+  Run Tests: $TEST
+"
 fi
+
 if [ "$CROSS" = "" ]; then
   CROSS="yes"
 fi
@@ -52,7 +55,7 @@ run_id=$8
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
-term=xterm-ubuntu
+term=xterm-256color
 export -- HOME=$run_home PATH=/sbin:/bin:/snap/bin:$run_home/bin TERM=$term
 
 if [[ "$run_id" == "" ]]; then
