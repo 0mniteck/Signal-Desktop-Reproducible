@@ -53,7 +53,7 @@ run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
 term=xterm-ubuntu
-export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$run_home/bin TERM=$term
+export -- HOME=$run_home PATH=/sbin:/bin:/snap/bin:$run_home/bin TERM=$term
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -102,6 +102,7 @@ docker=$docker_path/docker
 systemd_service=/etc/systemd/system/snap.docker.dockerd.service
 sysusr_service=$sysusr_path/docker.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
+docker_plugins=/$plugins_path/docker-
 
 sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
@@ -109,12 +110,16 @@ Group=$run_as\\
 Slice=docker.slice\\
 ProtectSystem=full\\
 ProtectHome=false\\
+ProtectClock=yes\\
 ProtectHostname=true\\
 ProtectKernelTunables=true\\
 ProtectKernelModules=true\\
 ProtectKernelLogs=true\\
 ProtectControlGroups=true\\
 RestrictRealtime=true\\
+RestrictNamespaces=true\\
+NoExecPaths=/\\
+ExecPaths=$rootless_path.sh -$home/$snap_path -/$snap_path -$home/bin -/sbin -/bin -/snap/bin\\
 _EOF__
 )
 
@@ -183,7 +188,8 @@ snap install docker --revision=$docker_snap_ver || echo "Failed to install Docke
 snap install syft --classic
 snap install grype --classic && echo
 
-for d in docker-daemon firewall-control opengl privileged support ; do
+for d in docker-daemon firewall-control opengl privileged support; do
+  ## active: home network network-bind network-control
   snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && sleep 1 && echo
 
@@ -194,8 +200,8 @@ mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 
 mkdir -p /$plugins_path && wait
-ln -f -s /$snap_path/$plugins_path/docker-buildx /$plugins_path/docker-buildx >> $nulled || exit 1
-ln -f -s /$snap_path/$plugins_path/docker-compose /$plugins_path/docker-compose >> $nulled || exit 1
+ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
+ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 
 clean_most
 
@@ -243,7 +249,7 @@ popd > /dev/null
 
 machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
-cd $(echo $PWD)
+cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config
@@ -594,7 +600,6 @@ mkdir -p Results && pushd Results > /dev/null
 popd > /dev/null
 
 read -p TEST_HERE2
-
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   chmod -x modules && source modules || drop_down || exit 1
 else
