@@ -114,6 +114,7 @@ Slice=docker.slice\\
 ProtectSystem=full\\
 ProtectHome=false\\
 ProtectClock=yes\\
+ProtectKernel=yes\\
 ProtectKernelTunables=true\\
 ProtectKernelModules=true\\
 ProtectKernelLogs=true\\
