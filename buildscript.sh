@@ -118,10 +118,8 @@ ProtectKernel=yes\\
 ProtectKernelTunables=true\\
 ProtectKernelModules=true\\
 ProtectKernelLogs=true\\
-ProtectControlGroups=true\\
 KeyringMode=private\\
 RestrictRealtime=true\\
-RestrictNamespaces=true\\
 NoExecPaths=/\\
 ExecPaths=$rootless_path.sh -$home/$snap_path -/$snap_path -$home/bin -/sbin -/bin -/snap/bin\\
 _EOF__
