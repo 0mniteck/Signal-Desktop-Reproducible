@@ -1,4 +1,4 @@
-#!/usr/bin/env -S - bash --norc --noprofile
+#!/bin/env -S - /bin/bash --norc --noprofile
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 
 while getopts ":c:i:d:m:p:r:t:" opt; do
@@ -48,10 +48,12 @@ if [ "$CROSS" = "" ]; then
 fi
 
 $debug
-run_id=$8
+run_id=$(id -u $8)
 run_as=$(id -u $run_id -n)
+run_dir=/run/user/$run_id
 run_home=/home/$run_as
-export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$run_home/bin TERM=xterm-256color
+term=xterm-ubuntu
+export -- HOME=$run_home PATH=/usr/sbin:/usr/bin:/snap/bin:$run_home/bin TERM=$term
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -80,15 +82,17 @@ source .pinned_ver
 if [[ "$(uname -m)" == "aarch64" ]]; then
   snap_path=snap/docker/$docker_snap_arm64_ver
   docker_snap_ver=$docker_snap_arm64_ver
+  uname=aarch64
 elif [[ "$(uname -m)" == "x86_64" ]]; then
   snap_path=snap/docker/$docker_snap_amd64_ver
   docker_snap_ver=$docker_snap_amd64_ver
+  uname=x86_64
 else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
-run_dir=/run/user/$run_id
-home=$HOME; path=$PATH; RUN_DIR=$run_dir
+RUN_DIR=$run_dir
+home=$HOME; path=$PATH
 data_dir=$home/.local/share
 sysusr_path=$data_dir/systemd/user
 rootless_path=$data_dir/rootless
@@ -103,6 +107,14 @@ sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
 Group=$run_as\\
 Slice=docker.slice\\
+ProtectSystem=full\\
+ProtectHome=false\\
+ProtectHostname=true\\
+ProtectKernelTunables=true\\
+ProtectKernelModules=true\\
+ProtectKernelLogs=true\\
+ProtectControlGroups=true\\
+RestrictRealtime=true\\
 _EOF__
 )
 
@@ -161,7 +173,7 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ scdaemon+ \
                                                                     slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ \
-                                                                    docker- docker.io- docker-ce- docker-ce-cli-
+                                                                    docker- docker.io- docker-ce- docker-ce-cli- || exit 1
 if [ "$MOUNT" != "" ]; then
     unmount
 fi
@@ -229,7 +241,7 @@ pushd $docker_data > /dev/null
   chown $run_as:$run_as $save_id
 popd > /dev/null
 
-machinectl shell $run_as@ /usr/bin/env - /bin/bash --norc --noprofile -c "
+machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $(echo $PWD)
 
@@ -241,8 +253,8 @@ SKIP_LOGIN=$SKIP_LOGIN PUSH=$PUSH PATH=$PATH \
 HOME=$HOME CROSS=$CROSS EPOCH=$EPOCH INC=$INC \
 MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
 DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
-XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/usr/bin/tty) \
-SSH_CONF=\$(<$HOME/.ssh/config) TERM=xterm-256color \
+XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/bin/tty) \
+SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
 
 eval \"\$(ssh-agent -s)\" && wait
 systemctl --user restart gpg-agent.service && wait
@@ -303,7 +315,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     mkdir -p $home/.password-store && mkdir -p $home/$snap_path/.password-store || exit 1
     pass init \$SIGNING_KEY && echo
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    # confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
+    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
@@ -324,11 +336,14 @@ chmod +x $rootless_path.sh || exit 1
 mkdir -p $home/bin && mkdir -p $home/docker && mkdir -p $home/.docker && \
 mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
 
+mkdir -p $home/$snap_path/usr/lib/$uname-linux-gnu && \
+cp /usr/lib/$uname-linux-gnu/libassuan.so.9* $home/$snap_path/usr/lib/$uname-linux-gnu/ || exit 1
+
 mkdir -p $sysusr_path && wait && \
 cp $systemd_service $sysusr_service || exit 1
 
 cat >> $rootless_path.sh << __EOF
-  #!/usr/bin/env -S - bash --norc --noprofile
+  #!/bin/env -S - /bin/bash --norc --noprofile
   $debug
   mkdir -p $rootless_path/tmp && wait
   > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
@@ -543,7 +558,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     installed='which docker-credential-pass' && \
     echo Installed at: \$(\$installed) || exit 1
     cp \$(which pass) $home/bin/pass && \
-    echo Installed at: $home/bin/pass || exit 1
+    echo Installed at: $home/bin/pass && \
     cp \$(which gpg) $home/bin/gpg && \
     echo Installed at: $home/bin/gpg || exit 1
   fi
@@ -551,7 +566,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store && \
-  echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker || exit 1
+  echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker/ || exit 1
+  
   read -p TEST_HERE1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
   grype login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to grype\n' || exit 1
@@ -572,11 +588,13 @@ mkdir -p Results && pushd Results > /dev/null
   env | sort >> $save_id
   declare >> $save_id
   mv $docker_data/0:0.env 0:0.env
-  quiet 'docker version > docker.info'
+  quiet '$docker version > docker.info'
   echo >> docker.info
-  quiet 'docker info >> docker.info'
+  quiet '$docker info >> docker.info'
 popd > /dev/null
+
 read -p TEST_HERE2
+
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   chmod -x modules && source modules || drop_down || exit 1
 else
