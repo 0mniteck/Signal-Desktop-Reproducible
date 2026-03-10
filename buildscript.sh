@@ -48,7 +48,7 @@ if [ "$CROSS" = "" ]; then
 fi
 
 $debug
-run_id=$(id -u $8)
+run_id=$8
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
