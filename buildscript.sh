@@ -111,17 +111,6 @@ sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
 Group=$run_as\\
 Slice=docker.slice\\
-ProtectSystem=full\\
-ProtectHome=false\\
-ProtectClock=yes\\
-ProtectKernel=yes\\
-ProtectKernelTunables=true\\
-ProtectKernelModules=true\\
-ProtectKernelLogs=true\\
-KeyringMode=private\\
-RestrictRealtime=true\\
-NoExecPaths=/\\
-ExecPaths=$rootless_path.sh -$home/$snap_path -/$snap_path -$home/bin -/sbin -/bin -/snap/bin\\
 _EOF__
 )
 
