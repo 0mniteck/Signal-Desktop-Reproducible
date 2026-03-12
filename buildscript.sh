@@ -566,10 +566,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && \
   echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker/ || exit 1
-  
-  read -p TEST_HERE1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
   grype login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to grype\n' || exit 1
+  read -p TEST_HERE1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
