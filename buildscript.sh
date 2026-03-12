@@ -559,6 +559,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo Installed at: $home/bin/pass && \
     cp \$(which gpg) $home/bin/gpg && \
     echo Installed at: $home/bin/gpg || exit 1
+    echo Installed at: $home/lib/$uname-linux-gnu/libassuan.so.9
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
