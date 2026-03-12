@@ -314,6 +314,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
     confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
+    mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -562,7 +563,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' || exit 1
-  mv -T $home/$snap_path/.password-store $home/.password-store && \
+  mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && \
   echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker/ || exit 1
   
   read -p TEST_HERE1
