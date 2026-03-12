@@ -310,9 +310,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
     mkdir -p $home/.password-store && mkdir -p $home/$snap_path/.password-store || exit 1
-    pass init \$SIGNING_KEY && echo
-    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled
-    confirm 'pass show - pinentry@gpg' && pass show docker-credential-helpers/docker-pass-initialized-check && echo || exit 1
+    pass init \$SIGNING_KEY && echo && \
+    printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
     mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
   else
@@ -565,9 +564,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && \
-  echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker/ || exit 1
+  echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
-  grype login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to grype\n' || exit 1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
