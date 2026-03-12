@@ -568,7 +568,6 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker/ || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
   grype login registry-1.docker.io -u \$USERNAME && echo -e 'Logged in to grype\n' || exit 1
-  read -p TEST_HERE1
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
