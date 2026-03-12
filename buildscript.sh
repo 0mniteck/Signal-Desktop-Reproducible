@@ -333,8 +333,8 @@ chmod +x $rootless_path.sh || exit 1
 mkdir -p $home/bin && mkdir -p $home/docker && mkdir -p $home/.docker && \
 mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
 
-mkdir -p $home/$snap_path/usr/lib/$uname-linux-gnu && \
-cp /usr/lib/$uname-linux-gnu/libassuan.so.9* $home/$snap_path/usr/lib/$uname-linux-gnu/ || exit 1
+mkdir -p $home/lib/$uname-linux-gnu && \
+cp /lib/$uname-linux-gnu/libassuan.so.9* $home/lib/$uname-linux-gnu/ || exit 1
 
 mkdir -p $sysusr_path && wait && \
 cp $systemd_service $sysusr_service || exit 1
@@ -561,7 +561,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; docker login' || exit 1
+  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store && \
   echo Credentials: \$(\$credstat) && cp $home/docker/* $home/.docker/ || exit 1
   
