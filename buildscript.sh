@@ -590,7 +590,6 @@ mkdir -p Results && pushd Results > /dev/null
   quiet '$docker info >> docker.info'
 popd > /dev/null
 
-read -p TEST_HERE2
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   chmod -x modules && source modules || drop_down || exit 1
 else
