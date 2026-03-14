@@ -16,11 +16,12 @@ if [ "$INC" != "" ]; then
   sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g readme.md
   sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g Dockerfile
   sed -i s/last_ver_num=$last_ver_num/last_ver_num=$ver_num/g .pinned_ver
+  sed -i s/last_epoch=$last_epoch/last_epoch=$source_date_epoch/g .pinned_ver
   echo "Version Incremented From v$last_ver_num To v$ver_num"
 fi
 
 pushd Results > /dev/null
-  rm -f $MODULE.* readme.md && echo && echo 'Starting cosign...'
+  rm -f */$MODULE.* ubuntu.* readme.md && echo && echo 'Starting cosign...'
   cosign_run_b="script -q -c 'cosign verify-attestation $source_loc \
     --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity $SIGSTORE_USR \
     --type spdxjson > base.image.sig' /dev/null > base.image.attested"
@@ -56,14 +57,6 @@ pushd Results > /dev/null
   for a in arm64 amd64; do
     scan_using_grype $MODULE $REPO/$MODULE:$rel_date $a $rel_date
   done
-  echo '# '$REPO/$MODULE:$rel_date > $MODULE.image.digest
-  cat $MODULE.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g' >> $MODULE.image.digest
-  cat $MODULE.image.digest >> readme.md && cat readme.md && echo && echo 'Starting cosign...'
-  cosign_run="script -q -c 'cosign verify-attestation docker.io/$REPO/$MODULE:$rel_date \
-    --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity $SIGSTORE_USR \
-    --type spdxjson > $MODULE.image.sig' /dev/null > $MODULE.image.attested"
-  quiet $cosign_run || quiet $cosign_run || exit 1
-  cat $MODULE.image.attested && echo
 popd > /dev/null
 
 docker run -it --cpus=$(nproc) \
