@@ -258,8 +258,8 @@ SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
 eval \"\$(ssh-agent -s)\" && wait
 systemctl --user restart gpg-agent.service && wait
 
-source .identity | echo $PWD/.identity sourced || exit 1
-source .pinned_ver | echo $PWD/.pinned_ver sourced || exit 1
+source .identity && echo $PWD/.identity sourced || exit 1
+source .pinned_ver && echo $PWD/.pinned_ver sourced || exit 1
 
 marker() { # \$1 = name, \$2 = syft/grype, \$3 = sort/order, \$4 = grep match
   unset \"wright\$3\"
