@@ -56,7 +56,7 @@ run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
 term=xterm-256color
-export -- HOME=$run_home PATH=/sbin:/bin:/snap/bin:$run_home/bin TERM=$term
+export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/.local/bin TERM=$term
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -95,7 +95,10 @@ fi
 
 RUN_DIR=$run_dir
 home=$HOME; path=$PATH
-data_dir=$home/.local/share
+local_data=$home/.local
+local_bin=$local_data/bin
+local_lib=$local_data/lib
+data_dir=$local_data/share
 rootless_path=$data_dir/rootless
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
@@ -135,6 +138,8 @@ clean_all() {
   rm -r -f $home/.docker/
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
+  rm -r -f $local_bin/
+  rm -r -f $local_lib/
   clean_most
   rm -r -f /var/snap/docker/
   rm -r -f /usr/libexec/docker/
@@ -191,11 +196,11 @@ quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 
+clean_most
+
 mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
-
-clean_most
 
 if [[ "$(cat /lib/udev/rules.d/60-scdaemon.rules | grep $run_as)" != *$run_as* ]]; then
   sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" \
@@ -258,8 +263,8 @@ SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
 eval \"\$(ssh-agent -s)\" && wait
 systemctl --user restart gpg-agent.service && wait
 
-source .identity && echo $PWD/.identity sourced || exit 1
-source .pinned_ver && echo $PWD/.pinned_ver sourced || exit 1
+source .identity && echo -e \"\n$PWD/.identity sourced\" || exit 1
+source .pinned_ver && echo -e \"$PWD/.pinned_ver sourced\n\" || exit 1
 
 marker() { # \$1 = name, \$2 = syft/grype, \$3 = sort/order, \$4 = grep match
   unset \"wright\$3\"
@@ -341,10 +346,10 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
 }
 
 drop_down() {
-  read -p 'Dropping down to shell; run source modules; or issue docker commands rootlessly;'
-  env - bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
-  echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
-  echo \"echo 'Dropped down to shell. exit when done, or press ctrl+d';echo; \
+  read -p '1.Run - source modules; or 2.Issue docker commands directly;'
+  /bin/env - /bin/bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
+  echo 'docker() { echd=\"\$@\"; \$docker \$echd; }'; \
+  echo \"echo 'Dropped down to interactive shell. Type exit when done, or press ctrl+d';echo; \
   PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
   PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
 }
@@ -389,6 +394,7 @@ confirm() { # \$1 = subject
 }
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  gpg2 --quick-set-ownertrust \$USER_ID ultimate
   if [[ \"\$SSH_CONF\" != *.pki* ]]; then
     echo \"
 Host .pki
@@ -405,11 +411,10 @@ Host \$PROJECT
   fi
   chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
   chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
-  gpg2 --quick-set-ownertrust \$USER_ID ultimate
-  ssh -T git@github.com 2>> $nulled
+  ssh -T git@github.com 2>> $nulled && echo
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
-  ssh-add -l && echo
+  echo && ssh-add -l && echo
   git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
   confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
@@ -424,7 +429,7 @@ Host \$PROJECT
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n'
-    mkdir -p $home/.password-store && mkdir -p $home/$snap_path/.password-store || exit 1
+    mkdir -p $home/.password-store $home/$snap_path/.password-store || exit 1
     pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store && mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
@@ -440,8 +445,8 @@ fi
 
 clean_some
 
-mkdir -p $docker_data/syft $docker_data/grype $home/docker $home/bin $home/lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
-> $rootless_path.sh && touch $rootless_path.sh $rootless_path/env-docker $rootless_path/env-rootless && chmod +x $rootless_path.sh || exit 1
+mkdir -p $docker_data/syft $docker_data/grype $home/docker $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
+touch $rootless_path.sh $rootless_path/env-docker $rootless_path/env-rootless && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/bin/env -S - /bin/bash --norc --noprofile
@@ -470,7 +475,7 @@ cat >> $rootless_path.sh << __EOF
   \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
   --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
   --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
-  --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
+  --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path.log'
 __EOF
 
 cp $systemd_service $sysusr_service && wait && \
@@ -482,7 +487,8 @@ sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path.slice.log
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path.dockerd.log
-source $rootless_path/env-rootless.exp | echo $rootless_path/env-rootless.exp sourced || exit 1
+
+source $rootless_path/env-rootless.exp && echo $rootless_path/env-rootless.exp sourced || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
@@ -497,23 +503,23 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mv \$cred_helper_name $home/bin/docker-credential-pass || exit 1
-    chmod +x $home/bin/docker-credential-pass && \
+    mv \$cred_helper_name $local_bin/docker-credential-pass || exit 1
+    chmod +x $local_bin/docker-credential-pass && \
     echo '{
   \"credsStore\": \"pass\"
 }' > $home/docker/config.json && \
     installed='which docker-credential-pass' && \
     echo Installed at: \$(\$installed) && \
-    cp \$(which pass) $home/bin/pass && \
-    echo Installed at: $home/bin/pass && \
-    cp \$(which gpg) $home/bin/gpg && \
-    echo Installed at: $home/bin/gpg && \
-    cp /lib/$uname-linux-gnu/libassuan.so.9* $home/lib/$uname-linux-gnu/ && \
-    echo Installed at: $home/lib/$uname-linux-gnu/libassuan.so.9 || exit 1
+    cp \$(which pass) $local_bin/pass && \
+    echo Installed at: $local_bin/pass && \
+    cp \$(which gpg) $local_bin/gpg && \
+    echo Installed at: $local_bin/gpg && \
+    cp /lib/$uname-linux-gnu/libassuan.so.9* $local_lib/$uname-linux-gnu/ && \
+    echo Installed at: $local_lib/$uname-linux-gnu/libassuan.so.9 || exit 1
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' && \
+  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-linux-gnu ; docker login' && \
   mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || \
   mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
@@ -589,8 +595,10 @@ fi
 
 pushd Results > /dev/null
   scan_using_grype ubuntu \"/ --select-catalogers directory\"
+  touch readme.md && cat */*.vulns >> readme.md && cat *.vulns >> readme.md
   sed -i 's/^/#### /g' readme.md && echo '\`\`\`' >> readme.md
-  cat *.image.digest >> readme.md && cat readme.md && echo
+  cat */*.image.digest >> readme.md && cat *.image.digest >> readme.md && \
+  cat readme.md && echo
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
