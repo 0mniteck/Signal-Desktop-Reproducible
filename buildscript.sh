@@ -1,7 +1,7 @@
 #!/bin/env -S - /bin/bash --norc --noprofile
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 
-while getopts ":c:i:d:m:p:r:t:" opt; do
+while getopts ":c:d:i:m:p:r:t:" opt; do
   case $opt in
   c) # Cross Compile: yes/No
     CROSS="$OPTARG"
@@ -27,14 +27,19 @@ while getopts ":c:i:d:m:p:r:t:" opt; do
   esac
 done
 
+if [ "$CROSS" = "" ]; then
+  CROSS="yes"
+fi
 if [ "$TEST" = "" ]; then
   TEST="no"
   nulled=/dev/null
 else
   TEST="yes"
   SKIP_LOGIN="yes"
-  nulled=/tmp/nulled.log
   debug="set -x"
+  nulled=/tmp/nulled.log
+  touch $nulled
+  chown root:root $nulled
   echo "
   Cross Compile: $CROSS
   Increment: $INC
@@ -43,11 +48,7 @@ else
   Push to Branch: $BRANCH
   Tag Release: $TAG
   Run Tests: $TEST
-"
-fi
-
-if [ "$CROSS" = "" ]; then
-  CROSS="yes"
+" >> $nulled
 fi
 
 $debug
@@ -56,7 +57,14 @@ run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
 term=xterm-256color
-export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/bin TERM=$term
+
+export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/docker/bin TERM=$term
+rel_date=$(date -d "$(date)" +%m-%d-%Y)
+repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
+name=$(cat .identity | grep NAME= | cut -d'=' -f2)
+module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
+arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
+amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -65,24 +73,14 @@ if [[ "$run_id" == "" ]]; then
     echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n"
     runm="exec pkexec --keep-cwd '$0' '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$(id -u)'"
     if [[ "$(which asciinema)" != "" ]]; then
-      repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
-      project=$(cat .identity | grep PROJECT= | cut -d'=' -f2)
-      rel_date=$(date -d "$(date)" +%m-%d-%Y)
       mkdir -p $run_home/.casts/$repo && \
-      exec asciinema rec --overwrite -t "$repo/$project:$rel_date" $run_home/.casts/$repo/$project:$rel_date.cast -c "$runm"
+      exec asciinema rec --overwrite -t "$repo/$name:$rel_date" $run_home/.casts/$repo/$name:$rel_date.cast -c "$runm"
     else
       $runm
     fi
   fi
 fi
 
-if [ "$TEST" = "yes" ]; then
-  touch $nulled
-  chown root:root $nulled
-fi
-
-arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
-amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 if [[ "$(uname -m)" == "aarch64" ]]; then
   docker_snap_ver=$arm64_ver
   uname=aarch64
@@ -96,8 +94,8 @@ fi
 RUN_DIR=$run_dir
 home=$HOME; path=$PATH
 local_data=$home/.local
-local_bin=$home/bin
-local_lib=$home/lib
+local_bin=$home/docker/bin
+local_lib=$home/docker/lib
 data_dir=$local_data/share
 rootless_path=$data_dir/rootless
 sc_rules=/lib/udev/rules.d/60-scdaemon.rules
@@ -123,7 +121,7 @@ _EOF__
 clean_most() {
   rm -r -f /home/root/*
   rm -r -f /root/snap/docker/
-  rm -r -f $data_dir/docker/
+  rm -r -f $docker_data*
   rm -r -f $run_dir/containerd/
   rm -r -f $run_dir/docker*
   rm -r -f $run_dir/runc/
@@ -140,8 +138,6 @@ clean_all() {
   rm -r -f $home/.docker/
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
-  rm -r -f $local_bin/
-  rm -r -f $local_lib/
   clean_most
   rm -r -f /var/snap/docker/
   rm -r -f /usr/libexec/docker/
@@ -153,8 +149,8 @@ unmount() {
   quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2) && \
   rm -r -f $docker_data/* && sync
   quiet umount $docker_data && sleep 1
-  quiet systemd-cryptsetup detach Luks-Signal && sleep 1
-  quiet dmsetup remove /dev/mapper/Luks-Signal && sleep 1
+  quiet systemd-cryptsetup detach $module && sleep 1
+  quiet dmsetup remove /dev/mapper/$module && sleep 1
   rm -r -f $docker_data/ && sync
 }
 
@@ -203,27 +199,26 @@ mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 
-if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
-  sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" $sc_rules
-  udevadm control --reload-rules && udevadm trigger
-fi
-
-if [[ "$SKIP_LOGIN" == "" ]]; then
-  while [[ "$(lsusb | grep Yubikey)" != *Yubikey* ]]; do
-    printf "\r🔐 Please insert yubikey...\033[K"
-  done && sleep 1 && echo
-fi
-
-quiet chown $run_as:$run_as /dev/hidraw*
-BUS=$(lsusb -d 1050: | grep -o Bus.... - | grep -o [0-9][0-9][0-9])
-DEVICE=$(lsusb -d 1050: | grep -o Device.... - | grep -o [0-9][0-9][0-9])
-set_facl="setfacl -m u:$run_as:rw /dev/bus/usb/$BUS/$DEVICE"
-quiet $set_facl || quiet $set_facl || exit 1
-
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
+if [[ "$SKIP_LOGIN" == "" ]]; then
+  if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
+    sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" $sc_rules
+    udevadm control --reload-rules && udevadm trigger
+  fi
+  
+  while [[ "$(lsusb -d 1050: | grep Yubikey)" != *Yubikey* ]]; do
+    printf "\r🔐 Please insert yubikey - (CCID)\033[K"
+  done && sleep 1 && echo
+
+  quiet chown $run_as:$run_as /dev/hidraw*
+  BUS=$(lsusb -d 1050: | grep -o Bus.... - | grep -o [0-9][0-9][0-9])
+  DEVICE=$(lsusb -d 1050: | grep -o Device.... - | grep -o [0-9][0-9][0-9])
+  set_facl="setfacl -m u:$run_as:rw /dev/bus/usb/$BUS/$DEVICE"
+  quiet $set_facl || quiet $set_facl || exit 1
+fi
+
 if [ "$MOUNT" != "" ]; then
-  module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
   systemd-cryptsetup attach $module /dev/$MOUNT && sleep 1 && echo
   mount /dev/mapper/$module $docker_data && sleep 1
   rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
@@ -346,36 +341,49 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
   fi
 }
 
+ssh_config() {
+  if [[ \"\$SSH_CONF\" != *\$MODULE* ]]; then
+    echo \"
+Host \$MODULE
+  Hostname github.com
+  IdentityFile $home/\$IDENTITY_FILE
+  IdentitiesOnly yes\" >> $home/.ssh/config
+  fi
+  if [[ \"\$SSH_CONF\" != *.pki* ]]; then
+    echo \"
+Host .pki
+  Hostname github.com
+  IdentityFile $home/\$PKI_ID_FILE
+  IdentitiesOnly yes\" >> $home/.ssh/config
+  fi
+}
+
 drop_down() {
-  read -p '1.Run - source modules; or 2.Issue docker commands directly;'
-  /bin/env - /bin/bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
-  echo 'docker() { echd=\"\$@\"; \$docker \$echd; }'; \
-  echo \"echo 'Dropped down to interactive shell. Type exit when done, or press ctrl+d';echo; \
-  PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
-  PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
+  read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
+  /bin/env - /bin/bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); echo 'docker() { echd=\"\$@\"; \$docker \$echd; }'; \
+  echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
+  PROMPT_COMMAND='echo -e \\\\nRootless~Docker:~\$'\")
 }
 
 clean_some() {
-  rm -r -f /home/$run_as/bin/
-  rm -r -f /home/$run_as/lib/
-  rm -r -f /home/$run_as/docker/
-  rm -r -f /home/$run_as/.docker/
-  rm -r -f /home/$run_as/.local/share/rootless*
-  rm -r -f /home/$run_as/.local/share/systemd/
+  rm -r -f $home/docker/
+  rm -r -f $home/.docker/
+  rm -r -f $data_dir/rootless*
+  rm -r -f $data_dir/systemd/
 }
 
 sys_ctl_common() {
   systemctl --user daemon-reload && wait
   systemctl --user reset-failed && wait
   systemctl --user stop docker* --all && wait
-  systemctl --user list-units docker* --all && echo
+  grep 0 <(systemctl --user list-units docker* --all --no-pager) || exit 1
 }
 
 subver() {
   sub_ver=\$1
   rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y-00\$sub_ver\")
   date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d-00\$sub_ver\")
-  echo \"Build Subversion: 00\$sub_ver\" && echo 
+  echo -e \"Build Subversion: 00\$sub_ver\n\" 
 }
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
@@ -397,27 +405,13 @@ confirm() { # \$1 = subject
 }
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  gpg2 --quick-set-ownertrust \$USER_ID ultimate
-  chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
-  chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
-  if [[ \"\$SSH_CONF\" != *.pki* ]]; then
-    echo \"
-Host .pki
-  Hostname github.com
-  IdentityFile $home/\$PKI_ID_FILE
-  IdentitiesOnly yes\" >> $home/.ssh/config
-  fi
-  if [[ \"\$SSH_CONF\" != *\$PROJECT* ]]; then
-    echo \"
-Host \$PROJECT
-  Hostname github.com
-  IdentityFile $home/\$IDENTITY_FILE
-  IdentitiesOnly yes\" >> $home/.ssh/config
-  fi
-  ssh -T git@github.com 2>> $nulled && echo
-  ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE
-  ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
-  echo && ssh-add -l && echo
+  gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
+  chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub && \
+  chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub || exit 1
+  ssh_config && ssh -T git@github.com 2>> $nulled && echo || exit 1 
+  ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE && \
+  ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE && \
+  echo && ssh-add -l && echo || exit 1
   git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
   confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
@@ -431,11 +425,10 @@ Host \$PROJECT
   git submodule --quiet foreach \"git remote remove origin && git remote add origin git@\$name:\$REPO/\$name.git\"
   # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
-    echo -e '\nSigning key present\n'
-    mkdir -p $home/.password-store $home/$snap_path/.password-store || exit 1
-    pass init \$SIGNING_KEY && echo && \
+    echo -e '\nSigning key present\n' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
-    mv -T $home/.password-store $home/$snap_path/.password-store && mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
+    mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
+    mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -448,7 +441,7 @@ fi
 
 clean_some
 
-mkdir -p $docker_data/syft $docker_data/grype $home/docker $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
+mkdir -p $docker_data/syft $docker_data/grype $docker_data/tmp $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path.sh $rootless_path/env-docker $rootless_path/env-rootless && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
@@ -521,9 +514,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-linux-gnu ; docker login' && \
-  mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || \
-  mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && exit 1
+  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-linux-gnu ; docker login' || exit 1
+  mv -T $home/$snap_path/.password-store $home/.password-store || exit 1
+  mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
@@ -643,4 +636,5 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
+
 exit 0
