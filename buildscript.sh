@@ -258,90 +258,86 @@ SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
 eval \"\$(ssh-agent -s)\" && wait
 systemctl --user restart gpg-agent.service && wait
 
-source .identity | echo .identity sourced || exit 1
-source .pinned_ver | echo .pinned_ver(sions) sourced || exit 1
+source .identity | echo $PWD/.identity sourced || exit 1
+source .pinned_ver | echo $PWD/.pinned_ver sourced || exit 1
 
-marker() { # \$1 = Name, \$2 = Order, \$3 = syft/grype, \$4 = Marker/ID
-  unset \"wright\$2\"
-  grep \"\$4\" \$1.\$3.tmp | tail -n 1 > \$1.\$3.status.\$2
-  line1=\$(cat \$1.\$3.status.\$2)
-  if [[ \"\$line1\" == *\$4* ]]; then
-    export -- \"wright\$2\"=\"\$line1\"
+marker() { # \$1 = name, \$2 = syft/grype, \$3 = sort/order, \$4 = grep match
+  unset \"wright\$3\"
+  grep \"\$4\" \$1.\$2.tmp | tail -n 1 > \$1.\$2.status.\$3
+  line=\$(cat \$1.\$2.status.\$3)
+  if [[ \"\$line\" == *\$4* ]]; then
+    export -- \"wright\$3\"=\"\$line\"
   fi
-  rm -f \$1.\$3.tmp*
-  rm -f \$1.\$3.status.*
 }
 
-wright() { # \$1 = Name, \$2 = syft/grype
+wright() { # \$1 = name, \$2 = syft/grype
   echo \$wright1 > \$1.\$2.status
   echo \$wright2 >> \$1.\$2.status
   echo \$wright3 >> \$1.\$2.status
-  echo \$wright4 >> \$1.\$2.status
-  echo \$wright5 >> \$1.\$2.status
+  if [[ \"\$2\" == \"syft\" ]]; then
+    echo \$wright4 >> \$1.\$2.status
+    echo \$wright5 >> \$1.\$2.status
+  fi
   sed -i 's/[^[:print:]]//g' \$1.\$2.status
   sed -i 's/\[K//g' \$1.\$2.status
   sed -i 's/\[2A//g' \$1.\$2.status
   sed -i 's/\[3A//g' \$1.\$2.status
+  rm -f \$1.\$2.tmp*
+  rm -f \$1.\$2.status.*
 }
 
-gryped() { # \$1 = Name
-  marker \$1 1 grype \"✔ Scanned for vulnerabilities\"
-  marker \$1 2 grype \"├── by severity:\"
-  marker \$1 3 grype \"└── by status:\"
+gryped() { # \$1 = name
+  marker \$1 grype 1 \"✔ Scanned for vulnerabilities\"
+  marker \$1 grype 2 \"├── by severity:\"
+  marker \$1 grype 3 \"└── by status:\"
   wright \$1 grype
 }
 
-syfted() { # \$1 = Name
-  marker \$1 1 syft \"✔ Cataloged contents\"
-  marker \$1 2 syft \"├── ✔ Packages\"
-  marker \$1 3 syft \"├── ✔ Executables\"
-  marker \$1 4 syft \"├── ✔ File metadata\"
-  marker \$1 5 syft \"└── ✔ File digests\"
+syfted() { # \$1 = name
+  marker \$1 syft 1 \"✔ Cataloged contents\"
+  marker \$1 syft 2 \"├── ✔ Packages\"
+  marker \$1 syft 3 \"├── ✔ Executables\"
+  marker \$1 syft 4 \"├── ✔ File metadata\"
+  marker \$1 syft 5 \"└── ✔ File digests\"
   wright \$1 syft
 }
 
-scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalogers directory', \$3 = Platform(amd64/arm64), \$4 = Attest Tag
-  src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
-  if [[ \"\$3\" != \"\" ]]; then
-    mkdir -p \$3
-    pushd \$3 > /dev/null
-    arch=--platform\ \$3
-    if [[ \"\$4\" != \"\" ]]; then
-      if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-        read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo
-        echo 'Starting Syft...'
-        touch .pager && tail -f .pager & pid=\$!
-        syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager\"
-    	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
-        kill \$pid && rm -f .pager
-        echo
+scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64/arm64), \$4 = tag to attest
+  if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+    src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
+    if [[ \"\$3\" != \"\" ]]; then
+      mkdir -p \$3
+      pushd \$3 > /dev/null
+      arch=--platform\ \$3
+      if [[ \"\$4\" != \"\" ]]; then
+          read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo -e '\nStarting Syft...'
+          touch .pager1 && tail -f .pager1 & pid1=\$!
+          syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager1\"
+      	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
+          kill \$pid1 && rm -f .pager1 && echo || exit 1
       else
-        echo 'Skipping attestation: not logged in'
+        echo -e '\nStarting Syft...'
       fi
     else
-      echo 'Starting Syft...'
+      pushd . > /dev/null
     fi
+    touch \$1.syft.tmp && tail -f \$1.syft.tmp & pid2=\$!
+    syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
+    quiet \$syft_run || quiet \$syft_run || exit 1
+    kill \$pid2 && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
+    echo -e '\nStarting Grype...' && grype config > $docker_data/.grype.yaml
+    touch \$1.grype.tmp && tail -f \$1.grype.tmp & pid3=\$!
+    script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
+    -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
+    kill \$pid3 && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
+  	echo '### '\$1:\$3' Syft Scan Results - '\$(syft --version) > \$1.contents
+  	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
+  	echo '### '\$1:\$3' Grype Scan Results - '\$(grype --version) > \$1.vulns
+  	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
+    popd > /dev/null
   else
-    pushd . > /dev/null
+    echo 'Skipping Syft, Grype, and Attestations: Docker Hub: not logged in...'
   fi
-  touch \$1.syft.tmp && tail -f \$1.syft.tmp & pidd=\$!
-  syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
-  quiet \$syft_run || quiet \$syft_run || exit 1
-  kill \$pidd && rm -f -r $docker_data/syft/*
-  echo && echo 'Starting Grype...'
-  grype config > $docker_data/.grype.yaml
-  touch \$1.grype.tmp && tail -f \$1.grype.tmp & piddd=\$!
-  script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
-  -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
-  kill \$piddd && rm -f -r $docker_data/grype/*
-	syfted \$1
-  gryped \$1
-	echo '### '\$1' Syft Scan Results - '\$(syft --version) > \$1.contents
-	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
-	echo '### '\$1' Grype Scan Results - '\$(grype --version) >> readme.md
-	cat \$1.grype.status >> readme.md
-	echo '## ' >> readme.md
-  popd > /dev/null
 }
 
 drop_down() {
@@ -431,8 +427,7 @@ Host \$PROJECT
     mkdir -p $home/.password-store && mkdir -p $home/$snap_path/.password-store || exit 1
     pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
-    mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
-    mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
+    mv -T $home/.password-store $home/$snap_path/.password-store && mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
   else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
@@ -445,18 +440,8 @@ fi
 
 clean_some
 
-mkdir -p $rootless_path/tmp && wait && > $rootless_path.sh && \
-> $rootless_path/env-docker && > $rootless_path/env-rootless && \
-chmod +x $rootless_path.sh || exit 1
-
-mkdir -p $home/bin && mkdir -p $home/docker && mkdir -p $home/.docker && \
-mkdir -p $docker_data/syft && mkdir -p $docker_data/grype || exit 1
-
-mkdir -p $home/lib/$uname-linux-gnu && \
-cp /lib/$uname-linux-gnu/libassuan.so.9* $home/lib/$uname-linux-gnu/ || exit 1
-
-mkdir -p $sysusr_path && wait && \
-cp $systemd_service $sysusr_service || exit 1
+mkdir -p $docker_data/syft $docker_data/grype $home/docker $home/bin $home/lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
+> $rootless_path.sh && touch $rootless_path.sh $rootless_path/env-docker $rootless_path/env-rootless && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/bin/env -S - /bin/bash --norc --noprofile
@@ -488,23 +473,60 @@ cat >> $rootless_path.sh << __EOF
   --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
 __EOF
 
-sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
-sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service
-sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$data_dir/rootless.sh\'|\" $sysusr_service
+cp $systemd_service $sysusr_service && wait && \
+sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
+sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
+sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
-systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
-source $rootless_path/env-rootless.exp | echo env-rootless.exp sourced || exit 1
-quiet \"$docker info | grep rootless > $rootless_path/rootless.status\"
+systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path.slice.log
+systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path.dockerd.log
+source $rootless_path/env-rootless.exp | echo $rootless_path/env-rootless.exp sourced || exit 1
+quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
-if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
+if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
   echo -e 'Rootless Docker Failed\n' && exit 1
 else
   rootless='Rootless Docker Started\n'
   echo -e \$rootless
-  echo -e \$rootless > $rootless_path/rootless.status
+  echo -e \$rootless > $rootless_path/tmp/rootless.status
 fi
+
+if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
+    validate.with.pki \"\$cred_helper\" || exit 1
+    echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
+    mv \$cred_helper_name $home/bin/docker-credential-pass || exit 1
+    chmod +x $home/bin/docker-credential-pass && \
+    echo '{
+  \"credsStore\": \"pass\"
+}' > $home/docker/config.json && \
+    installed='which docker-credential-pass' && \
+    echo Installed at: \$(\$installed) && \
+    cp \$(which pass) $home/bin/pass && \
+    echo Installed at: $home/bin/pass && \
+    cp \$(which gpg) $home/bin/gpg && \
+    echo Installed at: $home/bin/gpg && \
+    cp /lib/$uname-linux-gnu/libassuan.so.9* $home/lib/$uname-linux-gnu/ && \
+    echo Installed at: $home/lib/$uname-linux-gnu/libassuan.so.9 || exit 1
+  fi
+  credstat='docker-credential-pass list'
+  echo && read -p '🔐 Press enter to start docker login.'
+  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' && \
+  mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || \
+  mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && exit 1
+  syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
+fi
+
+if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
+  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
+elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
+  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
+else
+  echo 'Unknown Architecture '\$(uname -m) && exit 1
+fi
+echo
 
 source_date_epoch=1
 if [[ \"\$EPOCH\" = *today* ]]; then
@@ -547,40 +569,6 @@ else
   sub_ver=1
   subver \$sub_ver
 fi
-
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
-    validate.with.pki \"\$cred_helper\" || exit 1
-    echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mv \$cred_helper_name $home/bin/docker-credential-pass || exit 1
-    chmod +x $home/bin/docker-credential-pass && \
-    echo '{
-  \"credsStore\": \"pass\"
-}' > $home/docker/config.json && \
-    installed='which docker-credential-pass' && \
-    echo Installed at: \$(\$installed) || exit 1
-    cp \$(which pass) $home/bin/pass && \
-    echo Installed at: $home/bin/pass && \
-    cp \$(which gpg) $home/bin/gpg && \
-    echo Installed at: $home/bin/gpg || exit 1
-    echo Installed at: $home/lib/$uname-linux-gnu/libassuan.so.9
-  fi
-  credstat='docker-credential-pass list'
-  echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$home/bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$home/lib/:$home/lib/aarch64-linux-gnu ; docker login' || exit 1
-  mv -T $home/$snap_path/.password-store $home/.password-store && mv -T $home/$snap_path/.gnupg $home/.gnupg && \
-  echo Credentials: \$(\$credstat) || exit 1
-  syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
-fi
-
-if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
-elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
-else
-  echo 'Unknown Architecture '\$(uname -m) && exit 1
-fi
-echo
 
 mkdir -p Results && pushd Results > /dev/null
   save_id=$run_id:$run_id.env
@@ -645,4 +633,5 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
+
 exit 0
