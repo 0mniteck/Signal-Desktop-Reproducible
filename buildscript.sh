@@ -56,7 +56,7 @@ run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
 term=xterm-256color
-export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/.local/bin TERM=$term
+export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/bin TERM=$term
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -81,8 +81,8 @@ if [ "$TEST" = "yes" ]; then
   chown root:root $nulled
 fi
 
-arm64_ver=$(cat .pinned_ver | grep docker_snap_arm64_ver= | cut -d'=' -f2)
-amd64_ver=$(cat .pinned_ver | grep docker_snap_amd64_ver= | cut -d'=' -f2)
+arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
+amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 if [[ "$(uname -m)" == "aarch64" ]]; then
   docker_snap_ver=$arm64_ver
   uname=aarch64
@@ -96,10 +96,11 @@ fi
 RUN_DIR=$run_dir
 home=$HOME; path=$PATH
 local_data=$home/.local
-local_bin=$local_data/bin
-local_lib=$local_data/lib
+local_bin=$home/bin
+local_lib=$home/lib
 data_dir=$local_data/share
 rootless_path=$data_dir/rootless
+sc_rules=/lib/udev/rules.d/60-scdaemon.rules
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
 systemd_path=/etc/systemd/system
@@ -110,6 +111,7 @@ docker_plugins=/$plugins_path/docker-
 docker_data=$data_dir/docker
 docker_path=/$snap_path/bin
 docker=$docker_path/docker
+dockerd=${docker}d
 
 sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
@@ -186,8 +188,7 @@ snap install syft --classic
 snap install grype --classic && echo
 
 for d in docker-daemon firewall-control opengl privileged support; do
-  ## active: home network network-bind network-control
-  snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
+  snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1 ## active: home network network-bind network-control
 done && sleep 1 && echo
 
 systemd_ctl_common
@@ -202,9 +203,8 @@ mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 
-if [[ "$(cat /lib/udev/rules.d/60-scdaemon.rules | grep $run_as)" != *$run_as* ]]; then
-  sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" \
-  /lib/udev/rules.d/60-scdaemon.rules
+if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
+  sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" $sc_rules
   udevadm control --reload-rules && udevadm trigger
 fi
 
@@ -215,16 +215,17 @@ if [[ "$SKIP_LOGIN" == "" ]]; then
 fi
 
 quiet chown $run_as:$run_as /dev/hidraw*
-DEVICE=$(lsusb -d 1050: | grep -o Device.... - | grep -o [0-9][0-9][0-9])
 BUS=$(lsusb -d 1050: | grep -o Bus.... - | grep -o [0-9][0-9][0-9])
+DEVICE=$(lsusb -d 1050: | grep -o Device.... - | grep -o [0-9][0-9][0-9])
 set_facl="setfacl -m u:$run_as:rw /dev/bus/usb/$BUS/$DEVICE"
 quiet $set_facl || quiet $set_facl || exit 1
 
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
 if [ "$MOUNT" != "" ]; then
-  systemd-cryptsetup attach Luks-Signal /dev/$MOUNT && sleep 1 && echo
-  mount /dev/mapper/Luks-Signal $docker_data && sleep 1
+  module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
+  systemd-cryptsetup attach $module /dev/$MOUNT && sleep 1 && echo
+  mount /dev/mapper/$module $docker_data && sleep 1
   rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
 fi
 if [ "$TEST" = "yes" ]; then
@@ -355,6 +356,8 @@ drop_down() {
 }
 
 clean_some() {
+  rm -r -f /home/$run_as/bin/
+  rm -r -f /home/$run_as/lib/
   rm -r -f /home/$run_as/docker/
   rm -r -f /home/$run_as/.docker/
   rm -r -f /home/$run_as/.local/share/rootless*
@@ -395,6 +398,8 @@ confirm() { # \$1 = subject
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate
+  chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
+  chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
   if [[ \"\$SSH_CONF\" != *.pki* ]]; then
     echo \"
 Host .pki
@@ -409,8 +414,6 @@ Host \$PROJECT
   IdentityFile $home/\$IDENTITY_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config
   fi
-  chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
-  chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
   ssh -T git@github.com 2>> $nulled && echo
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
@@ -472,7 +475,7 @@ cat >> $rootless_path.sh << __EOF
   GRYPE_DB_CACHE_DIR=$docker_data/grype
   PATH=$path:$docker_path\" >> $rootless_path/env-rootless
   sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
-  \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $(echo $docker)d --rootless \
+  \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
   --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
   --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
   --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path.log'
@@ -487,7 +490,6 @@ sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path.slice.log
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path.dockerd.log
-
 source $rootless_path/env-rootless.exp && echo $rootless_path/env-rootless.exp sourced || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
@@ -641,5 +643,4 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
-
 exit 0
