@@ -22,11 +22,11 @@ fi
 
 pushd Results > /dev/null
   rm -f */$MODULE.* ubuntu.* readme.md && echo && echo 'Starting cosign...'
-  cosign_run_b="script -q -c 'cosign verify-attestation $source_loc \
+  cosign_run_src="script -q -c 'cosign verify-attestation $source_loc \
     --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity $SIGSTORE_USR \
-    --type spdxjson > base.image.sig' /dev/null > base.image.attested"
-  quiet $cosign_run_b || quiet $cosign_run_b || exit 1
-  cat base.image.attested && echo
+    --type spdxjson > source.image.sig' /dev/null > source.image.attested"
+  quiet $cosign_run_src || quiet $cosign_run_src || exit 1
+  cat source.image.attested && echo
 popd > /dev/null
 
 docker buildx create \
