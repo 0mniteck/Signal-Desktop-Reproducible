@@ -81,14 +81,13 @@ if [ "$TEST" = "yes" ]; then
   chown root:root $nulled
 fi
 
-source .pinned_ver
+arm64_ver=$(cat .pinned_ver | grep docker_snap_arm64_ver= | cut -d'=' -f2)
+amd64_ver=$(cat .pinned_ver | grep docker_snap_amd64_ver= | cut -d'=' -f2)
 if [[ "$(uname -m)" == "aarch64" ]]; then
-  snap_path=snap/docker/$docker_snap_arm64_ver
-  docker_snap_ver=$docker_snap_arm64_ver
+  docker_snap_ver=$arm64_ver
   uname=aarch64
 elif [[ "$(uname -m)" == "x86_64" ]]; then
-  snap_path=snap/docker/$docker_snap_amd64_ver
-  docker_snap_ver=$docker_snap_amd64_ver
+  docker_snap_ver=$amd64_ver
   uname=x86_64
 else
   echo 'Unknown Architecture '$(uname -m) && exit 1
@@ -97,15 +96,17 @@ fi
 RUN_DIR=$run_dir
 home=$HOME; path=$PATH
 data_dir=$home/.local/share
-sysusr_path=$data_dir/systemd/user
 rootless_path=$data_dir/rootless
+sysusr_path=$data_dir/systemd/user
+sysusr_service=$sysusr_path/docker.dockerd.service
+systemd_path=/etc/systemd/system
+systemd_service=$systemd_path/snap.docker.dockerd.service
+plugins_path=usr/libexec/docker/cli-plugins
+snap_path=snap/docker/$docker_snap_ver
+docker_plugins=/$plugins_path/docker-
 docker_data=$data_dir/docker
 docker_path=/$snap_path/bin
 docker=$docker_path/docker
-systemd_service=/etc/systemd/system/snap.docker.dockerd.service
-sysusr_service=$sysusr_path/docker.dockerd.service
-plugins_path=usr/libexec/docker/cli-plugins
-docker_plugins=/$plugins_path/docker-
 
 sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
@@ -113,11 +114,6 @@ Group=$run_as\\
 Slice=docker.slice\\
 _EOF__
 )
-
-quiet() {
-  echt="$@"
-  script -a -q -c "$echt" $nulled >> $nulled
-}
 
 clean_most() {
   rm -r -f /home/root/*
@@ -145,13 +141,6 @@ clean_all() {
   rm -r -f /var/lib/snapd/cache/*
 }
 
-systemd_ctl_common() {
-  snap stop docker && wait
-  systemctl daemon-reload && wait
-  systemctl reset-failed && wait
-  systemctl stop snap.docker.* --all && wait
-}
-
 unmount() {
   quiet snap disable docker && sleep 1
   quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2) && \
@@ -160,6 +149,18 @@ unmount() {
   quiet systemd-cryptsetup detach Luks-Signal && sleep 1
   quiet dmsetup remove /dev/mapper/Luks-Signal && sleep 1
   rm -r -f $docker_data/ && sync
+}
+
+systemd_ctl_common() {
+  snap stop docker && wait
+  systemctl daemon-reload && wait
+  systemctl reset-failed && wait
+  systemctl stop snap.docker.* --all && wait
+}
+
+quiet() {
+  echt="$@"
+  script -a -q -c "$echt" $nulled >> $nulled
 }
 
 clean_all
@@ -243,7 +244,7 @@ $debug
 cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
-touch $home/.ssh/config && chmod 0644 $home/.ssh/config
+touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- \
 SKIP_LOGIN=$SKIP_LOGIN PUSH=$PUSH PATH=$PATH \
@@ -252,16 +253,105 @@ MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
 DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
 XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/bin/tty) \
 SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
+|| exit 1
 
 eval \"\$(ssh-agent -s)\" && wait
 systemctl --user restart gpg-agent.service && wait
 
-source .identity
-source .pinned_ver
+source .identity | echo .identity sourced || exit 1
+source .pinned_ver | echo .pinned_ver(sions) sourced || exit 1
 
-chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
-chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
-gpg2 --quick-set-ownertrust \$USER_ID ultimate
+marker() { # \$1 = Name, \$2 = Order, \$3 = syft/grype, \$4 = Marker/ID
+  unset \"wright\$2\"
+  grep \"\$4\" \$1.\$3.tmp | tail -n 1 > \$1.\$3.status.\$2
+  line1=\$(cat \$1.\$3.status.\$2)
+  if [[ \"\$line1\" == *\$4* ]]; then
+    export -- \"wright\$2\"=\"\$line1\"
+  fi
+  rm -f \$1.\$3.tmp*
+  rm -f \$1.\$3.status.*
+}
+
+wright() { # \$1 = Name, \$2 = syft/grype
+  echo \$wright1 > \$1.\$2.status
+  echo \$wright2 >> \$1.\$2.status
+  echo \$wright3 >> \$1.\$2.status
+  echo \$wright4 >> \$1.\$2.status
+  echo \$wright5 >> \$1.\$2.status
+  sed -i 's/[^[:print:]]//g' \$1.\$2.status
+  sed -i 's/\[K//g' \$1.\$2.status
+  sed -i 's/\[2A//g' \$1.\$2.status
+  sed -i 's/\[3A//g' \$1.\$2.status
+}
+
+gryped() { # \$1 = Name
+  marker \$1 1 grype \"✔ Scanned for vulnerabilities\"
+  marker \$1 2 grype \"├── by severity:\"
+  marker \$1 3 grype \"└── by status:\"
+  wright \$1 grype
+}
+
+syfted() { # \$1 = Name
+  marker \$1 1 syft \"✔ Cataloged contents\"
+  marker \$1 2 syft \"├── ✔ Packages\"
+  marker \$1 3 syft \"├── ✔ Executables\"
+  marker \$1 4 syft \"├── ✔ File metadata\"
+  marker \$1 5 syft \"└── ✔ File digests\"
+  wright \$1 syft
+}
+
+scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalogers directory', \$3 = Platform(amd64/arm64), \$4 = Attest Tag
+  src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
+  if [[ \"\$3\" != \"\" ]]; then
+    mkdir -p \$3
+    pushd \$3 > /dev/null
+    arch=--platform\ \$3
+    if [[ \"\$4\" != \"\" ]]; then
+      if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+        read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo
+        echo 'Starting Syft...'
+        touch .pager && tail -f .pager & pid=\$!
+        syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager\"
+    	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
+        kill \$pid && rm -f .pager
+        echo
+      else
+        echo 'Skipping attestation: not logged in'
+      fi
+    else
+      echo 'Starting Syft...'
+    fi
+  else
+    pushd . > /dev/null
+  fi
+  touch \$1.syft.tmp && tail -f \$1.syft.tmp & pidd=\$!
+  syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
+  quiet \$syft_run || quiet \$syft_run || exit 1
+  kill \$pidd && rm -f -r $docker_data/syft/*
+  echo && echo 'Starting Grype...'
+  grype config > $docker_data/.grype.yaml
+  touch \$1.grype.tmp && tail -f \$1.grype.tmp & piddd=\$!
+  script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
+  -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
+  kill \$piddd && rm -f -r $docker_data/grype/*
+	syfted \$1
+  gryped \$1
+	echo '### '\$1' Syft Scan Results - '\$(syft --version) > \$1.contents
+	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
+	echo '### '\$1' Grype Scan Results - '\$(grype --version) >> readme.md
+	cat \$1.grype.status >> readme.md
+	echo '## ' >> readme.md
+  popd > /dev/null
+}
+
+drop_down() {
+  read -p 'Dropping down to shell; run source modules; or issue docker commands rootlessly;'
+  env - bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
+  echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
+  echo \"echo 'Dropped down to shell. exit when done, or press ctrl+d';echo; \
+  PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
+  PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
+}
 
 clean_some() {
   rm -r -f /home/$run_as/docker/
@@ -270,27 +360,56 @@ clean_some() {
   rm -r -f /home/$run_as/.local/share/systemd/
 }
 
+sys_ctl_common() {
+  systemctl --user daemon-reload && wait
+  systemctl --user reset-failed && wait
+  systemctl --user stop docker* --all && wait
+  systemctl --user list-units docker* --all && echo
+}
+
+subver() {
+  sub_ver=\$1
+  rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y-00\$sub_ver\")
+  date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d-00\$sub_ver\")
+  echo \"Build Subversion: 00\$sub_ver\" && echo 
+}
+
+validate.with.pki() { # \$1 = full_url.TDL/.../[file]
+  chmod +x .pki/local.sh && ./.pki/local.sh \$1 || exit 1
+}
+
+docker() {
+  echd=\"\$@\"
+  $docker \$echd
+}
+
+quiet() {
+  echt=\"\$@\"
+  script -a -q -c \"\$echt\" $nulled >> $nulled
+}
+
 confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
 
-if [[ \"\$SSH_CONF\" != *.pki* ]]; then
-  echo \"
+if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  if [[ \"\$SSH_CONF\" != *.pki* ]]; then
+    echo \"
 Host .pki
   Hostname github.com
   IdentityFile $home/\$PKI_ID_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config
-fi
-
-if [[ \"\$SSH_CONF\" != *\$PROJECT* ]]; then
-  echo \"
+  fi
+  if [[ \"\$SSH_CONF\" != *\$PROJECT* ]]; then
+    echo \"
 Host \$PROJECT
   Hostname github.com
   IdentityFile $home/\$IDENTITY_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config
-fi
-
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  fi
+  chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub
+  chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub
+  gpg2 --quick-set-ownertrust \$USER_ID ultimate
   ssh -T git@github.com 2>> $nulled
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE
@@ -369,119 +488,6 @@ cat >> $rootless_path.sh << __EOF
   --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
 __EOF
 
-drop_down() {
-  read -p 'Dropping down to shell; run source modules; or issue docker commands rootlessly;'
-  env - bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); \
-  echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
-  echo \"echo 'Dropped down to shell. exit when done, or press ctrl+d';echo; \
-  PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
-  PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
-}
-
-marker() { # \$1 = Name, \$2 = Order, \$4 = Marker/ID, \$3 = syft/grype
-  unset \"wright\$2\"
-  grep \"\$4\" \$1.\$3.tmp | tail -n 1 > \$1.\$3.status.\$2
-  line1=\$(cat \$1.\$3.status.\$2)
-  if [[ \"\$line1\" == *\$4* ]]; then
-    export -- \"wright\$2\"=\"\$line1\"
-  fi
-  rm -f \$1.\$3.tmp*
-  rm -f \$1.\$3.status.*
-}
-
-wright() { # \$1 = Name, \$2 = syft/grype
-  echo \$wright1 > \$1.\$2.status
-  echo \$wright2 >> \$1.\$2.status
-  echo \$wright3 >> \$1.\$2.status
-  echo \$wright4 >> \$1.\$2.status
-  echo \$wright5 >> \$1.\$2.status
-  sed -i 's/[^[:print:]]//g' \$1.\$2.status
-  sed -i 's/\[K//g' \$1.\$2.status
-  sed -i 's/\[2A//g' \$1.\$2.status
-  sed -i 's/\[3A//g' \$1.\$2.status
-}
-
-gryped() { # \$1 = Name
-  marker \$1 1 grype \"✔ Scanned for vulnerabilities\"
-  marker \$1 2 grype \"├── by severity:\"
-  marker \$1 3 grype \"└── by status:\"
-  wright \$1 grype
-}
-
-syfted() { # \$1 = Name
-  marker \$1 1 syft \"✔ Cataloged contents\"
-  marker \$1 2 syft \"├── ✔ Packages\"
-  marker \$1 3 syft \"├── ✔ Executables\"
-  marker \$1 4 syft \"├── ✔ File metadata\"
-  marker \$1 5 syft \"└── ✔ File digests\"
-  wright \$1 syft
-}
-
-scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalogers directory', \$3 = Platform(amd64/arm64), \$4 = Attest Tag
-  src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
-  if [[ \"\$3\" != \"\" ]]; then
-    mkdir -p \$3
-    pushd \$3 > /dev/null
-    arch=--platform\ \$3
-    if [[ \"\$4\" != \"\" ]]; then
-      if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-        read -p \"🔐 Press enter to start attestation for \$3\" && echo
-        echo 'Starting Syft...'
-        touch .pager && tail -f .pager & pid=\$!
-        syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager\"
-    	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
-        kill \$pid && rm -f .pager
-        echo
-      else
-        echo 'Skipping attestation: not logged in'
-      fi
-    else
-      echo 'Starting Syft...'
-    fi
-  else
-    pushd . > /dev/null
-  fi
-  touch \$1.syft.tmp && tail -f \$1.syft.tmp & pidd=\$!
-  syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
-  quiet \$syft_run || quiet \$syft_run || exit 1
-  kill \$pidd && rm -f -r $docker_data/syft/*
-  echo && echo 'Starting Grype...'
-  grype config > $docker_data/.grype.yaml
-  touch \$1.grype.tmp && tail -f \$1.grype.tmp & piddd=\$!
-  script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
-  -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
-  kill \$piddd && rm -f -r $docker_data/grype/*
-	syfted \$1
-  gryped \$1
-	echo '### '\$1' Syft Scan Results - '\$(syft --version) > \$1.contents
-	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
-	echo '### '\$1' Grype Scan Results - '\$(grype --version) >> readme.md
-	cat \$1.grype.status >> readme.md
-	echo '## ' >> readme.md
-  popd > /dev/null
-}
-
-sys_ctl_common() {
-  systemctl --user daemon-reload && wait
-  systemctl --user reset-failed && wait
-  systemctl --user stop docker* --all && wait
-  systemctl --user list-units docker* --all && echo
-}
-
-quiet() {
-  echt=\"\$@\"
-  script -a -q -c \"\$echt\" $nulled >> $nulled
-}
-
-docker() {
-  echd=\"\$@\"
-  $docker \$echd
-}
-
-validate.with.pki() { # \$1 = full_url.TDL/.../[file]
-  chmod +x .pki/local.sh && ./.pki/local.sh \$1 || exit 1
-}
-
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service
 sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$data_dir/rootless.sh\'|\" $sysusr_service
@@ -489,7 +495,7 @@ sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$data_dir/rootless.sh\'|\" $sysu
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/rootless.ctl.log
-source $rootless_path/env-rootless.exp
+source $rootless_path/env-rootless.exp | echo env-rootless.exp sourced || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/rootless.status)\" != *rootless* ]]; then
@@ -532,13 +538,6 @@ rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
 sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
-
-subver() {
-  sub_ver=\$1
-  rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y-00\$sub_ver\")
-  date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d-00\$sub_ver\")
-  echo \"Build Subversion: 00\$sub_ver\" && echo 
-}
 
 if [[ \"\$rel_ver\" -lt 1 ]]; then
   wait
