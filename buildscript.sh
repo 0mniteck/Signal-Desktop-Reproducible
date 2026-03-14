@@ -316,6 +316,12 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
           syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager1\"
       	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
           kill \$pid1 && rm -f .pager1 && echo || exit 1
+          echo -e '\nStarting Cosign...'
+          cosign_run=\"script -q -c 'cosign verify-attestation docker.io/\$REPO/\$1:\$4 \
+            --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity \$SIGSTORE_USR \
+            --type spdxjson > \$1.image.sig' /dev/null > \$1.image.attested\"
+          quiet \$cosign_run || quiet \$cosign_run || exit 1
+          cat \$1.image.attested && echo
       else
         echo -e '\nStarting Syft...'
       fi
@@ -335,6 +341,8 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
   	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
   	echo '### '\$1:\$3' Grype Scan Results - '\$(grype --version) > \$1.vulns
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
+    echo '# '\$REPO/\$1:\$4 > \$1.image.digest
+    cat ../\$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g' >> \$1.image.digest
     popd > /dev/null
   else
     echo 'Skipping Syft, Grype, and Attestations: Docker Hub: not logged in...'
