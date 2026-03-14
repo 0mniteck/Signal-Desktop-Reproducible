@@ -378,14 +378,54 @@ drop_down() {
   PROMPT_COMMAND='echo;echo Rootless~Docker:~\$'\")
 }
 
+marker() { # \$1 = Name, \$2 = Order, \$4 = Marker/ID, \$3 = syft/grype
+  unset \"wright\$2\"
+  grep \"\$4\" \$1.\$3.tmp | tail -n 1 > \$1.\$3.status.\$2
+  line1=\$(cat \$1.\$3.status.\$2)
+  if [[ \"\$line1\" == *\$4* ]]; then
+    export -- \"wright\$2\"=\"\$line1\"
+  fi
+  rm -f \$1.\$3.tmp*
+  rm -f \$1.\$3.status.*
+}
+
+wright() { # \$1 = Name, \$2 = syft/grype
+  echo \$wright1 > \$1.\$2.status
+  echo \$wright2 >> \$1.\$2.status
+  echo \$wright3 >> \$1.\$2.status
+  echo \$wright4 >> \$1.\$2.status
+  echo \$wright5 >> \$1.\$2.status
+  sed -i 's/[^[:print:]]//g' \$1.\$2.status
+  sed -i 's/\[K//g' \$1.\$2.status
+  sed -i 's/\[2A//g' \$1.\$2.status
+  sed -i 's/\[3A//g' \$1.\$2.status
+}
+
+gryped() { # \$1 = Name
+  marker \$1 1 grype \"✔ Scanned for vulnerabilities\"
+  marker \$1 2 grype \"├── by severity:\"
+  marker \$1 3 grype \"└── by status:\"
+  wright \$1 grype
+}
+
+syfted() { # \$1 = Name
+  marker \$1 1 syft \"✔ Cataloged contents\"
+  marker \$1 2 syft \"├── ✔ Packages\"
+  marker \$1 3 syft \"├── ✔ Executables\"
+  marker \$1 4 syft \"├── ✔ File metadata\"
+  marker \$1 5 syft \"└── ✔ File digests\"
+  wright \$1 syft
+}
+
 scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalogers directory', \$3 = Platform(amd64/arm64), \$4 = Attest Tag
   src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
   if [[ \"\$3\" != \"\" ]]; then
-    mkdir -p \$3 && pushd \$3
+    mkdir -p \$3
+    pushd \$3 > /dev/null
     arch=--platform\ \$3
     if [[ \"\$4\" != \"\" ]]; then
       if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-        read -p '🔐 Press enter to start attestation for \$3' && echo
+        read -p \"🔐 Press enter to start attestation for \$3\" && echo
         echo 'Starting Syft...'
         touch .pager && tail -f .pager & pid=\$!
         syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager\"
@@ -399,7 +439,7 @@ scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalo
       echo 'Starting Syft...'
     fi
   else
-    pushd .
+    pushd . > /dev/null
   fi
   touch \$1.syft.tmp && tail -f \$1.syft.tmp & pidd=\$!
   syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
@@ -411,48 +451,14 @@ scan_using_grype() { # \$1 = Name, \$2 = Repo/Name:tag or '/Path --select-catalo
   script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
   -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
   kill \$piddd && rm -f -r $docker_data/grype/*
-  marker() { # \$1 = Name, \$2 = Order, \$4 = Marker/ID, \$3 = syft/grype
-    unset \"wright\$2\"
-    grep \"\$4\" \$1.\$3.tmp | tail -n 1 > \$1.\$3.status.\$2
-    line1=\$(cat \$1.\$3.status.\$2)
-    if [[ \"\$line1\" == *\$4* ]]; then
-      export -- \"wright\$2\"=\"\$line1\"
-    fi
-		rm -f \$1.\$3.tmp*
-		rm -f \$1.\$3.status.*
-  }
-  wright() { # \$1 = Name, \$2 = syft/grype
-		echo \$wright1 > \$1.\$2.status
-		echo \$wright2 >> \$1.\$2.status
-		echo \$wright3 >> \$1.\$2.status
-		echo \$wright4 >> \$1.\$2.status
-		echo \$wright5 >> \$1.\$2.status
-		sed -i 's/[^[:print:]]//g' \$1.\$2.status
-		sed -i 's/\[K//g' \$1.\$2.status
-		sed -i 's/\[2A//g' \$1.\$2.status
-		sed -i 's/\[3A//g' \$1.\$2.status
-	}
-	gryped() { # \$1 = Name
-		marker \$1 1 grype \"✔ Scanned for vulnerabilities\"
-		marker \$1 2 grype \"├── by severity:\"
-		marker \$1 3 grype \"└── by status:\"
-		wright \$1 grype
-	}
-	syfted() { # \$1 = Name
-		marker \$1 1 syft \"✔ Cataloged contents\"
-		marker \$1 2 syft \"├── ✔ Packages\"
-		marker \$1 3 syft \"├── ✔ Executables\"
-		marker \$1 4 syft \"├── ✔ File metadata\"
-		marker \$1 5 syft \"└── ✔ File digests\"
-		wright \$1 syft
-	}
-	syfted &&	gryped
+	syfted \$1
+  gryped \$1
 	echo '### '\$1' Syft Scan Results - '\$(syft --version) > \$1.contents
 	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
 	echo '### '\$1' Grype Scan Results - '\$(grype --version) >> readme.md
 	cat \$1.grype.status >> readme.md
 	echo '## ' >> readme.md
-  popd
+  popd > /dev/null
 }
 
 sys_ctl_common() {
