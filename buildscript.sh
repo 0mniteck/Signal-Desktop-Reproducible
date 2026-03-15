@@ -308,7 +308,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
     if [[ \"\$3\" != \"\" ]]; then
       mkdir -p \$3
       pushd \$3 > /dev/null
-      arch=--platform\ \$3
+      arch=--platform\ linux/\$3
       if [[ \"\$4\" != \"\" ]]; then
           read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo -e '\nStarting Syft...'
           touch .pager1 && tail -f .pager1 & pid1=\$!
