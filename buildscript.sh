@@ -425,7 +425,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git fetch --unshallow 2>> $nulled
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
-  confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
+  echo && confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
   git submodule add git@.pki:\$REPO/.pki.git
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
@@ -490,7 +490,7 @@ sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path.slice.log
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path.dockerd.log
-source $rootless_path/env-rootless.exp && echo $rootless_path/env-rootless.exp sourced || exit 1
+source $rootless_path/env-rootless.exp && echo -e '\n$rootless_path/env-rootless.exp sourced\n' || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
@@ -643,5 +643,4 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
-
 exit 0
