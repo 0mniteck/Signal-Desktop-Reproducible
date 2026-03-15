@@ -448,7 +448,7 @@ fi
 
 clean_some
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
-touch $rootless_path.sh $rootless_path/{env-docker,env-rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
+touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/bin/env -S - /bin/bash --norc --noprofile
