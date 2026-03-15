@@ -304,7 +304,7 @@ syfted() { # \$1 = name
 
 scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64/arm64), \$4 = tag to attest
   if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-    src=\"--source-name \$1 --source-supplier 0mniteck42 --source-version \$(date +%s)\"
+    src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     if [[ \"\$3\" != \"\" ]]; then
       mkdir -p \$3
       pushd \$3 > /dev/null
