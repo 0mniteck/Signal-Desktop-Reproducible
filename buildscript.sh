@@ -61,7 +61,6 @@ term=xterm-256color
 export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/docker/bin TERM=$term
 rel_date=$(date -d "$(date)" +%m-%d-%Y)
 repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
-name=$(cat .identity | grep NAME= | cut -d'=' -f2)
 module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
 arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
 amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
@@ -74,7 +73,7 @@ if [[ "$run_id" == "" ]]; then
     runm="exec pkexec --keep-cwd '$0' '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$(id -u)'"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
-      exec asciinema rec --overwrite -t "$repo/$name:$rel_date" $run_home/.casts/$repo/$name:$rel_date.cast -c "$runm"
+      exec asciinema rec --overwrite -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$runm"
     else
       $runm
     fi
