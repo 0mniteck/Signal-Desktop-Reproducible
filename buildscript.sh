@@ -419,7 +419,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE && \
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE && \
   echo && ssh-add -l && echo || exit 1
-  git remote remove origin && git remote add origin git@\$PROJECT:\$REPO/\$PROJECT.git
+  git remote remove origin && git remote add origin git@\$MODULE:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
   confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
   git fetch --unshallow 2>> $nulled
