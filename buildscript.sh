@@ -182,8 +182,9 @@ snap install docker --revision=$docker_snap_ver || echo "Failed to install Docke
 snap install syft --classic
 snap install grype --classic && echo
 
-for d in docker-daemon firewall-control opengl privileged support; do
-  snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1 ## active: home network network-bind network-control
+snap set docker nvidia-support.disabled=true
+for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
+  snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && sleep 1 && echo
 
 systemd_ctl_common
@@ -255,7 +256,7 @@ XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/bin/tty) \
 SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
 || exit 1
 
-eval \"\$(ssh-agent -s)\" && wait
+eval \"\$(ssh-agent -s)\" >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
 
 source .identity && echo -e \"\n$PWD/.identity sourced\" || exit 1
@@ -430,7 +431,6 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
   git submodule --quiet foreach \"git remote remove origin && git remote add origin git@\$name:\$REPO/\$name.git\"
-  # echo && read -p '🔐 Press enter to start Github CLI login.' && gh auth login || exit 1
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present\n' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
@@ -447,15 +447,13 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
 fi
 
 clean_some
-
-mkdir -p $docker_data/syft $docker_data/grype $docker_data/tmp $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
-touch $rootless_path.sh $rootless_path/env-docker $rootless_path/env-rootless && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
+mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
+touch $rootless_path.sh $rootless_path/{env-docker,env-rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
   #!/bin/env -S - /bin/bash --norc --noprofile
   $debug
-  mkdir -p $rootless_path/tmp && wait
-  > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
+  mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
   rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
   env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
   echo \"docker=$docker
@@ -636,11 +634,12 @@ quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
 rm -r -f $home/$snap_path/* && sync
 snap remove docker --purge 2>> $nulled && wait
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
-snap remove grype --purge
 snap remove syft --purge
+snap remove grype --purge
 clean_all
 
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
+
 exit 0
