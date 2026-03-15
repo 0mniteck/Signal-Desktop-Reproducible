@@ -315,7 +315,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
           syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager1\"
       	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
           kill \$pid1 && rm -f .pager1 && echo || exit 1
-          echo -e '\nStarting Cosign...'
+          echo -e '\nStarting Cosign...' && sleep 5
           cosign_run=\"script -q -c 'cosign verify-attestation docker.io/\$REPO/\$1:\$4 \
             --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity \$SIGSTORE_USR \
             --type spdxjson > \$1.image.sig' /dev/null > \$1.image.attested\"
