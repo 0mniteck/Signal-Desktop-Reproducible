@@ -168,9 +168,9 @@ quiet() {
 clean_all
 
 apt-get -qq update && apt-get -qq upgrade -y && \
-apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dosfstools+ gh+ git-lfs+ gnupg2+ gpg-agent+ jq+ \
-                                                                    parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ scdaemon+ \
-                                                                    slirp4netns+ snapd+ systemd-container+ \
+apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ gh+ git-lfs+ gnupg2+ \
+                                                                    gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
+                                                                    scdaemon+ slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- || exit 1
 if [ "$MOUNT" != "" ]; then
