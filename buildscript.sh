@@ -8,8 +8,7 @@ while getopts ":c:d:i:m:p:r:t:" opt; do
     ;;
   d) # Date: source_date_epoch
     EPOCH="$OPTARG"
-    ;;COPY --from=base / /
-
+    ;;
   i) # Increment: .version
     INC="$OPTARG"
     ;;
