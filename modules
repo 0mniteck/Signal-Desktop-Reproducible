@@ -38,7 +38,7 @@ if [[ "$last_rel_date" != "$rel_date" ]]; then
   docker buildx build $CROSS \
     --push --tag $REPO/$MODULE:$rel_date \
     --metadata-file Results/$MODULE.meta.json \
-    --attest "type=provenance,mode=max" \
+    --attest "type=provenance,mode=max,version=v1" \
     --label org.opencontainers.image.vendor=$REPO \
     --label org.opencontainers.image.licenses=GPL-3.0 \
     --build-arg SOURCE_DATE_EPOCH=$source_date_epoch \
