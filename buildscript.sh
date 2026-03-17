@@ -307,11 +307,10 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
   if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     if [[ \"\$3\" != \"\" ]]; then
-      mkdir -p \$3
-      pushd \$3 > /dev/null
+      mkdir -p \$3 && pushd \$3 > /dev/null
       arch=--platform\ linux/\$3
       if [[ \"\$4\" != \"\" ]]; then
-          read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo -e '\nStarting Syft...'
+          read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo -e '\nStarting Syft...\n'
           touch .pager1 && tail -f .pager1 & pid1=\$!
           syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager1\"
       	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
@@ -327,6 +326,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
       fi
     else
       pushd . > /dev/null
+      unset arch
     fi
     touch \$1.syft.tmp && tail -f \$1.syft.tmp & pid2=\$!
     syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
@@ -337,9 +337,9 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
     script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
     -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
     kill \$pid3 && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
-  	echo '### '\$1:\$3' Syft Scan Results - '\$(syft --version) > \$1.contents
+  	echo '### '\$1:\$3' - Syft Scan Results - '\$(syft --version) > \$1.contents
   	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
-  	echo '### '\$1:\$3' Grype Scan Results - '\$(grype --version) > \$1.vulns
+  	echo '### '\$1:\$3' - Grype Scan Results - '\$(grype --version) > \$1.vulns
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
     echo '# '\$REPO/\$1:\$4 > \$1.image.digest
     cat ../\$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g' >> \$1.image.digest
@@ -412,6 +412,8 @@ confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
 
+clean_some
+
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
   chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub && \
@@ -427,7 +429,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
   echo && confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
-  git submodule add git@.pki:\$REPO/.pki.git
+  # git submodule add git@.pki:\$REPO/.pki.git
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
   git submodule --quiet foreach \"git remote remove origin && git remote add origin git@\$name:\$REPO/\$name.git\"
@@ -446,37 +448,67 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
 fi
 
-clean_some
+source_date_epoch=1
+if [[ \"\$EPOCH\" = *today* ]]; then
+  timestamp=\$(date -d \$(date +%D) +%s);
+  if [[ \"\$timestamp\" != \"\" ]]; then
+    echo \"Setting SOURCE_DATE_EPOCH from today's date: \$(date +%D) = @\$timestamp\";
+    source_date_epoch=\$((timestamp));
+  else
+    echo \"Can't get timestamp. Defaulting to 1.\";
+    source_date_epoch=1;
+  fi
+elif [[ \"\$EPOCH\" != 0 ]]; then
+  echo \"Using override timestamp \$EPOCH for SOURCE_DATE_EPOCH.\"
+  source_date_epoch=\$((\$EPOCH))
+else
+  timestamp=\$(cat Results/release.sha512sum | grep Epoch | cut -d ' ' -f5)
+  if [[ \"\$timestamp\" != \"\" ]]; then
+    echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \$(cat Results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\"
+    source_date_epoch=\$((timestamp))
+    check_file=1
+    cp Results/release.sha512sum /tmp/release.last.sha512sum
+  else
+    echo \"Can't get latest commit timestamp. Defaulting to 1.\"
+    source_date_epoch=1
+  fi
+fi
+echo && SOURCE_DATE_EPOCH=\$source_date_epoch
+
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
-  #!/bin/env -S - /bin/bash --norc --noprofile
-  $debug
-  mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
-  rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
-  env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
-  echo \"docker=$docker
-  HOME=$home
-  XDG_CONFIG_HOME=$home
-  XDG_RUNTIME_DIR=$run_dir
-  DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
-  DOCKER_TMPDIR=$docker_data/tmp
-  DOCKER_CONFIG=$home/docker
-  DOCKER_HOST=unix://$run_dir/docker.sock
-  BUILDX_METADATA_PROVENANCE=max
-  BUILDX_METADATA_WARNINGS=1
-  BUILDKIT_PROGRESS=tty
-  NO_COLOR=true
-  SOURCE_DATE_EPOCH=\$source_date_epoch
-  SYFT_CACHE_DIR=$docker_data/syft
-  GRYPE_DB_CACHE_DIR=$docker_data/grype
-  PATH=$path:$docker_path\" >> $rootless_path/env-rootless
-  sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
-  \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
-  --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
-  --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
-  --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path.log'
+#!/bin/env -S - /bin/bash --norc --noprofile
+$debug
+mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
+rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
+env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
+echo \"docker=$docker
+HOME=$home
+TERM=$term
+NO_COLOR=true
+XDG_CONFIG_HOME=$home
+XDG_RUNTIME_DIR=$run_dir
+DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
+DOCKER_TMPDIR=$docker_data/tmp
+DOCKER_CONFIG=$home/docker
+DOCKER_HOST=unix://$run_dir/docker.sock
+BUILDX_METADATA_PROVENANCE=max
+BUILDX_METADATA_WARNINGS=1
+BUILDX_GIT_LABELS=full
+BUILDKIT_PROGRESS=tty
+BUILDKIT_TTY_LOG_LINES=15
+BUILDKIT_MULTI_PLATFORM=true
+SOURCE_DATE_EPOCH=\$source_date_epoch
+SYFT_CACHE_DIR=$docker_data/syft
+GRYPE_DB_CACHE_DIR=$docker_data/grype
+PATH=$path:$docker_path\" >> $rootless_path/env-rootless
+sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
+\$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
+--userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
+--feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
+--exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
 __EOF
 
 cp $systemd_service $sysusr_service && wait && \
@@ -486,8 +518,8 @@ sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$rootless_path.sh\'|\" $sysusr_s
 
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
-systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path.slice.log
-systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path.dockerd.log
+systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path/docker.slice.log
+systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/docker.dockerd.log
 source $rootless_path/env-rootless.exp && echo -e '\n$rootless_path/env-rootless.exp sourced\n' || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
@@ -534,33 +566,6 @@ else
 fi
 echo
 
-source_date_epoch=1
-if [[ \"\$EPOCH\" = *today* ]]; then
-  timestamp=\$(date -d \$(date +%D) +%s);
-  if [[ \"\$timestamp\" != \"\" ]]; then
-    echo \"Setting SOURCE_DATE_EPOCH from today's date: \$(date +%D) = @\$timestamp\";
-    source_date_epoch=\$((timestamp));
-  else
-    echo \"Can't get timestamp. Defaulting to 1.\";
-    source_date_epoch=1;
-  fi
-elif [[ \"\$EPOCH\" != 0 ]]; then
-  echo \"Using override timestamp \$EPOCH for SOURCE_DATE_EPOCH.\"
-  source_date_epoch=\$((\$EPOCH))
-else
-  timestamp=\$(cat Results/release.sha512sum | grep Epoch | cut -d ' ' -f5)
-  if [[ \"\$timestamp\" != \"\" ]]; then
-    echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \$(cat Results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\"
-    source_date_epoch=\$((timestamp))
-    check_file=1
-    cp Results/release.sha512sum /tmp/release.last.sha512sum
-  else
-    echo \"Can't get latest commit timestamp. Defaulting to 1.\"
-    source_date_epoch=1
-  fi
-fi
-echo && SOURCE_DATE_EPOCH=\$source_date_epoch
-
 unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
@@ -576,11 +581,11 @@ else
   subver \$sub_ver
 fi
 
-mkdir -p Results && pushd Results > /dev/null
+pushd Results > /dev/null
   save_id=$run_id:$run_id.env
-  set > $save_id
-  env | sort >> $save_id
-  declare >> $save_id
+  set > \$save_id
+  env | sort >> \$save_id
+  declare >> \$save_id
   mv $docker_data/0:0.env 0:0.env
   quiet '$docker version > docker.info'
   echo >> docker.info
@@ -588,7 +593,7 @@ mkdir -p Results && pushd Results > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-  chmod -x modules && source modules || drop_down || exit 1
+  source modules || drop_down || exit 1
 else
   drop_down || exit 1
 fi
@@ -597,8 +602,7 @@ pushd Results > /dev/null
   scan_using_grype ubuntu \"/ --select-catalogers directory\"
   touch readme.md && cat */*.vulns >> readme.md && cat *.vulns >> readme.md
   sed -i 's/^/#### /g' readme.md && echo '\`\`\`' >> readme.md
-  cat */*.image.digest >> readme.md && cat *.image.digest >> readme.md && \
-  cat readme.md && echo
+  cat */*.image.digest >> readme.md && cat readme.md && echo
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
@@ -611,7 +615,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   fi
 fi
 
-docker-credential-pass erase
+docker-credential-pass erase &
 ssh-add -D && eval \"\$(ssh-agent -k)\"
 clean_some
 sys_ctl_common"
