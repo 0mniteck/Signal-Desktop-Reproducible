@@ -1,4 +1,5 @@
-# syntax=docker/dockerfile:1.22 check=error=true
+# syntax=docker/dockerfile:1
+# check=error=true
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 ARG BUILDKIT_SBOM_SCAN_CONTEXT=true BUILDKIT_SBOM_SCAN_STAGE=base,squasher SOURCE=0mniteck/debian-slim
 FROM $SOURCE AS base
