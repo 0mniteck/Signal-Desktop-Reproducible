@@ -473,7 +473,7 @@ else
     source_date_epoch=1
   fi
 fi
-echo && SOURCE_DATE_EPOCH=\$source_date_epoch
+echo && export -- SOURCE_DATE_EPOCH=\$source_date_epoch
 
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
