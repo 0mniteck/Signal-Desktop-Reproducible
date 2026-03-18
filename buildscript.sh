@@ -196,12 +196,11 @@ mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 
 clean_most
+rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
 mkdir -p /$plugins_path && wait
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
-
-rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
 if [[ "$SKIP_LOGIN" == "" ]]; then
   if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
@@ -531,7 +530,7 @@ BUILDKIT_MULTI_PLATFORM=true
 SOURCE_DATE_EPOCH=\$source_date_epoch
 SYFT_CACHE_DIR=$docker_data/syft
 GRYPE_DB_CACHE_DIR=$docker_data/grype
-PATH=$path:$docker_path:$home/docker/bin \" >> $rootless_path/env-rootless
+PATH=$path:$docker_path:$home/docker/bin\" >> $rootless_path/env-rootless
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
@@ -611,9 +610,7 @@ else
 fi
 
 pushd Results > /dev/null
-  rm -f */\$MODULE.* \$MODULE.* \
-  *.info *.env release.* *.md \
-  ubuntu.* source.*
+  rm -f *.*
   save_id=$run_id:$run_id.env
   set > \$save_id
   env | sort >> \$save_id
@@ -666,11 +663,11 @@ sed -i "s|:/home/root:|:/root:|" /etc/passwd
 quiet networkctl delete docker0
 systemd_ctl_common
 
-
 if [[ -d $home/$snap_path ]]; then
   quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
   rm -r -f $home/$snap_path/* && sync
 fi
+
 snap remove docker --purge 2>> $nulled && wait
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove syft --purge
@@ -680,5 +677,4 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
-
 exit 0
