@@ -185,10 +185,10 @@ fi
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
-snap install docker --revision=$docker_snap_ver && echo || echo "Failed to install Docker"
+snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
 
 snap set docker nvidia-support.disabled=true && \
-echo -e "Removing feature docker:nvidia-support\nRemoving feature docker:cdi" || \
+echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" || \
 echo "Failed to disable docker:nvidia-support"
 
 for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
