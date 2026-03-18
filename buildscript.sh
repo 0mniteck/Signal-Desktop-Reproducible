@@ -182,6 +182,8 @@ if [ "$MOUNT" != "" ]; then
     unmount
 fi
 
+snap install syft --classic
+snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
 snap install docker --revision=$docker_snap_ver && echo || echo "Failed to install Docker"
 
@@ -192,9 +194,6 @@ echo "Failed to disable docker:nvidia-support"
 for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
   snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && unset d && sleep 1 && echo
-
-snap install syft --classic
-snap install grype --classic && echo
 
 systemd_ctl_common
 quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
@@ -677,13 +676,15 @@ if [[ -d $home/$snap_path ]]; then
   rm -r -f $home/$snap_path/* && sync
 fi
 
-snap remove docker --purge 2>> $nulled && wait
-snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove syft --purge
 snap remove grype --purge
+snap remove docker --purge 2>> $nulled && wait
+snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
+
 clean_all
 
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
+
 exit 0
