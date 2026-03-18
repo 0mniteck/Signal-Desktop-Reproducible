@@ -303,47 +303,72 @@ syfted() { # \$1 = name
   wright \$1 syft
 }
 
-scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64/arm64), \$4 = tag to attest
+attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
+  read -p \"🔐 Press enter to start attestation for \$2\" && echo -e '\nStarting Syft...\n'
+  touch .pager1 && tail -f .pager1 & pid1=\$!
+  syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
+  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
+  kill \$pid1 && rm -f .pager1 && echo || exit 1
+  sleep 5
+  
+  echo \$2@\$(cat \$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g') > \$1.index.digest
+  docker buildx imagetools inspect --format '{{ json .Provenance }}' docker.io/\$2 > \$1.provenance.json
+  docker buildx imagetools inspect --format '{{ .Manifest }}' docker.io/\$2 > \$1.manifest.md
+  jsin=<(docker buildx imagetools inspect --format '{{ json . }}' docker.io/\$2) 
+  digest1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].digest | cut -d'\"' -f2)
+  arr1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].platform.architecture | cut -d'\"' -f2)
+  digest2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].digest | cut -d'\"' -f2)
+  arr2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].platform.architecture | cut -d'\"' -f2)
+  
+  att1=\$(echo \$(cat <(\$jsin) | jq .manifest.manifests.[2].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
+  att2=\$(echo \$(cat <(\$jsin) | jq .manifest.manifests.[3].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
+  img_name=\$(cat <(\$jsin) | jq .name | cut -d'\"' -f2)
+  
+  if [[ \"\$digest1\" == \"\$att1\" ]]; then
+    echo \$img_name@\$digest1 > \$arr1/\$1.manifest.digest
+  fi
+  if [[ \"\$digest2\" == \"\$att2\" ]]; then
+    echo \$img_name@\$digest2 > \$arr2/\$1.manifest.digest
+  fi
+  
+  for arr in \$arr1 \$arr2; do
+    echo 'Starting Cosign...'
+    cosign_run=\"script -q -c 'cosign verify-attestation docker.io/\$(cat \$arr/\$1.manifest.digest) \
+      --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity \$SIGSTORE_USR \
+      --type spdxjson > \$arr/\$1.sig.bundle' /dev/null > \$arr/\$1.attested\"
+    quiet \$cosign_run || quiet \$cosign_run || exit 1
+    cat \$arr/\$1.attested
+  done
+}
+
+scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64 or arm64)
   if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     if [[ \"\$3\" != \"\" ]]; then
-      mkdir -p \$3 && pushd \$3 > /dev/null
+      pushd \$3 > /dev/null
       arch=--platform\ linux/\$3
-      if [[ \"\$4\" != \"\" ]]; then
-          read -p \"🔐 Press enter to start attestation for \$2 - \$3\" && echo -e '\nStarting Syft...\n'
-          touch .pager1 && tail -f .pager1 & pid1=\$!
-          syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$arch -o spdx-json docker.io/\$REPO/\$1:\$4' /dev/null > .pager1\"
-      	  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
-          kill \$pid1 && rm -f .pager1 && echo || exit 1
-          echo -e '\nStarting Cosign...' && sleep 5
-          cosign_run=\"script -q -c 'cosign verify-attestation docker.io/\$REPO/\$1:\$4 \
-            --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity \$SIGSTORE_USR \
-            --type spdxjson > \$1.image.sig' /dev/null > \$1.image.attested\"
-          quiet \$cosign_run || quiet \$cosign_run || exit 1
-          cat \$1.image.attested && echo
-      else
-        echo -e '\nStarting Syft...'
-      fi
+      R=\"\$2 - \$3\" 
     else
       pushd . > /dev/null
       unset arch
+      R=\"\$1\"
     fi
+    echo -e '\nStarting Syft...\n'
     touch \$1.syft.tmp && tail -f \$1.syft.tmp & pid2=\$!
     syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
     quiet \$syft_run || quiet \$syft_run || exit 1
     kill \$pid2 && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
-    echo -e '\nStarting Grype...' && grype config > $docker_data/.grype.yaml
+    echo \$R' - Syft Scan Results - '\$(syft --version) > \$1.contents
+  	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
+    
+    echo -e 'Starting Grype...\n' && grype config > $docker_data/.grype.yaml
     touch \$1.grype.tmp && tail -f \$1.grype.tmp & pid3=\$!
     script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
     -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
     kill \$pid3 && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
-  	echo '### '\$1:\$3' - Syft Scan Results - '\$(syft --version) > \$1.contents
-  	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
-  	echo '### '\$1:\$3' - Grype Scan Results - '\$(grype --version) > \$1.vulns
+  	echo \$R' - Grype Scan Results - '\$(grype --version) > \$1.vulns
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
-    echo '# '\$REPO/\$1:\$4 > \$1.image.digest
-    cat ../\$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g' >> \$1.image.digest
-    popd > /dev/null
+  popd > /dev/null
   else
     echo 'Skipping Syft, Grype, and Attestations: Docker Hub: not logged in...'
   fi
@@ -571,6 +596,7 @@ rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
 sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
+tripl=\$REPO/\$MODULE:\$rel_date
 
 if [[ \"\$rel_ver\" -lt 1 ]]; then
   wait
@@ -582,6 +608,9 @@ else
 fi
 
 pushd Results > /dev/null
+  rm -f */\$MODULE.* \$MODULE.* \
+  *.info *.env release.* *.md \
+  ubuntu.* source.*
   save_id=$run_id:$run_id.env
   set > \$save_id
   env | sort >> \$save_id
