@@ -58,7 +58,7 @@ run_dir=/run/user/$run_id
 run_home=/home/$run_as
 term=xterm-256color
 
-export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin:$run_home/docker/bin TERM=$term
+export -- HOME=$run_home PATH=/bin:/sbin:/snap/bin TERM=$term
 rel_date=$(date -d "$(date)" +%m-%d-%Y)
 repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
 module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
@@ -145,8 +145,10 @@ clean_all() {
 
 unmount() {
   quiet snap disable docker && sleep 1
-  quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2) && \
-  rm -r -f $docker_data/* && sync
+  if [[ -d $docker_data ]]; then
+    quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2) && \
+    rm -r -f $docker_data/* && sync
+  fi
   quiet umount $docker_data && sleep 1
   quiet systemd-cryptsetup detach $module && sleep 1
   quiet dmsetup remove /dev/mapper/$module && sleep 1
@@ -506,6 +508,7 @@ touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path
 cat >> $rootless_path.sh << __EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug
+export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
 rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
@@ -528,7 +531,7 @@ BUILDKIT_MULTI_PLATFORM=true
 SOURCE_DATE_EPOCH=\$source_date_epoch
 SYFT_CACHE_DIR=$docker_data/syft
 GRYPE_DB_CACHE_DIR=$docker_data/grype
-PATH=$path:$docker_path\" >> $rootless_path/env-rootless
+PATH=$path:$docker_path:$home/docker/bin \" >> $rootless_path/env-rootless
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
@@ -657,14 +660,17 @@ if [ "$MOUNT" != "" ]; then
 fi
 
 clean_all
-quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime --now
-quiet systemctl unmask snap.docker.dockerd --runtime --now
+quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime
+quiet systemctl unmask snap.docker.dockerd --runtime
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 quiet networkctl delete docker0
 systemd_ctl_common
 
-quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
-rm -r -f $home/$snap_path/* && sync
+
+if [[ -d $home/$snap_path ]]; then
+  quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
+  rm -r -f $home/$snap_path/* && sync
+fi
 snap remove docker --purge 2>> $nulled && wait
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 snap remove syft --purge
