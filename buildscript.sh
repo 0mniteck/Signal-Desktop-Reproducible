@@ -103,6 +103,7 @@ sysusr_service=$sysusr_path/docker.dockerd.service
 systemd_path=/etc/systemd/system
 systemd_service=$systemd_path/snap.docker.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
+var_docker=/var/snap/docker
 snap_path=snap/docker/$docker_snap_ver
 docker_plugins=/$plugins_path/docker-
 docker_data=$data_dir/docker
@@ -121,6 +122,8 @@ clean_most() {
   rm -r -f /home/root/*
   rm -r -f /root/snap/docker/
   rm -r -f $docker_data*
+  rm -r -f $var_docker/common/*
+  rm -r -f $var_docker/$docker_snap_ver/*
   rm -r -f $run_dir/containerd/
   rm -r -f $run_dir/docker*
   rm -r -f $run_dir/runc/
@@ -138,7 +141,7 @@ clean_all() {
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
   clean_most
-  rm -r -f /var/snap/docker/
+  rm -r -f $var_docker/
   rm -r -f /usr/libexec/docker/
   rm -r -f /var/lib/snapd/cache/*
 }
@@ -180,14 +183,18 @@ if [ "$MOUNT" != "" ]; then
 fi
 
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
-snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
-snap install syft --classic
-snap install grype --classic && echo
+snap install docker --revision=$docker_snap_ver && echo || echo "Failed to install Docker"
 
-snap set docker nvidia-support.disabled=true
+snap set docker nvidia-support.disabled=true && \
+echo -e "Removing feature docker:nvidia-support\nRemoving feature docker:cdi" || \
+echo "Failed to disable docker:nvidia-support"
+
 for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
   snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
-done && sleep 1 && echo
+done && unset d && sleep 1 && echo
+
+snap install syft --classic
+snap install grype --classic && echo
 
 systemd_ctl_common
 quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
@@ -448,19 +455,21 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE && \
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE && \
   echo && ssh-add -l && echo || exit 1
+  
   git remote remove origin && git remote add origin git@\$MODULE:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
   confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
   git fetch --unshallow 2>> $nulled
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
+  
   echo && confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
   # git submodule add git@.pki:\$REPO/.pki.git
   git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
   git submodule update --init --remote --merge
-  git submodule --quiet foreach \"git remote remove origin && git remote add origin git@\$name:\$REPO/\$name.git\"
+  
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
-    echo -e '\nSigning key present\n' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
+    echo -e '\nSigning key present' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
     mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1
@@ -499,7 +508,14 @@ else
     source_date_epoch=1
   fi
 fi
-echo && export -- SOURCE_DATE_EPOCH=\$source_date_epoch
+export -- SOURCE_DATE_EPOCH=\$source_date_epoch
+
+unset rel_date date_rel rel_ver sub_ver
+rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
+date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
+rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
+sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
+echo -e \"Setting rel_date from today's date: \$rel_date\n\" && tripl=\$REPO/\$MODULE:\$rel_date
 
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
@@ -547,7 +563,7 @@ sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path/docker.slice.log
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/docker.dockerd.log
-source $rootless_path/env-rootless.exp && echo -e '\n$rootless_path/env-rootless.exp sourced\n' || exit 1
+source $rootless_path/env-rootless.exp && echo \"$rootless_path/env-rootless.exp sourced\" || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
@@ -592,13 +608,6 @@ else
   echo 'Unknown Architecture '\$(uname -m) && exit 1
 fi
 echo
-
-unset rel_date date_rel rel_ver sub_ver
-rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
-date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
-rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
-sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
-tripl=\$REPO/\$MODULE:\$rel_date
 
 if [[ \"\$rel_ver\" -lt 1 ]]; then
   wait
