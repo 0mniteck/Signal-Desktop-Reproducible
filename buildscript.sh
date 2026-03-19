@@ -406,9 +406,9 @@ Host .pki
 
 drop_down() {
   read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
-  /bin/env - /bin/bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
-  echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
-  PROMPT_COMMAND='echo -e \\\\nRootless~Docker:~\$'\")
+  /bin/env - /bin/bash --noprofile --rcfile <(echo source $rootless_path/tmp/env-rootless.exp; echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
+  echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
+  PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'\");
 }
 
 clean_some() {
@@ -523,24 +523,19 @@ sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$r
 echo -e \"Setting rel_date from today's date: \$rel_date\n\" && TRIPL=\$REPO/\$MODULE:\$rel_date
 
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
-touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
+touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug
 export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
-rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
-env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
-pushd $docker_data > /dev/null
-  save_id=docker.env
-  set > \$save_id
-  env | sort >> \$save_id
-  declare >> \$save_id
-popd > /dev/null
+rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp \
+/bin/env - /bin/bash --norc --noprofile -i -c '
+env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
-BUILDKIT_TTY_LOG_LINES=15
+BUILDKIT_TTY_LOG_LINES=$(($LINES - 15))
 BUILDX_GIT_LABELS=full
 BUILDX_METADATA_PROVENANCE=max
 BUILDX_METADATA_WARNINGS=1
@@ -561,18 +556,20 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
 --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
---exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash | /bin/bash 2>> $rootless_path/rootless.log'
+--exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/env - /bin/bash --norc --noprofile | \
+/bin/env - /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
+rm -f $rootless_path/env-*
 __EOF
 
 cp $systemd_service $sysusr_service && wait && \
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
-sed -i \"s|ExecStart.*|ExecStart=/bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
+sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
 sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
-systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path/docker.slice.log
-systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/docker.dockerd.log
+systemctl --user status docker.slice --all --no-pager -l > $rootless_path/docker.slice.log
+systemctl --user status docker.dockerd --all --no-pager -l > $rootless_path/docker.dockerd.log
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
@@ -638,7 +635,7 @@ pushd $results > /dev/null
     env | sort >> \$save_id
     declare >> \$save_id
     mv $docker_data/0:0.env 0:0.env
-    mv $docker_data/docker.env docker.env
+    cp $rootless_path/env-docker docker.env
     quiet '$docker version > docker.info'
     echo -e 'Info:\n' >> docker.info
     quiet '$docker info >> docker.info'
