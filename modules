@@ -76,7 +76,7 @@ fi
 docker run -it --cpus=$(nproc) \
   --network=name=host,\"driver-opt=network=host\" \
   --name $MODULE --platform linux/arm64 --cgroupns private \
-  -e SOURCE_DATE_EPOCH=$source_date_epoch $TRIPL $TEST $SIGNING_KEY
+  -e SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH $TRIPL $TEST $SIGNING_KEY
 
 rm -r -f builds/release && mkdir -p builds/release
 docker cp $MODULE:/$NAME/release/ builds/ && rm -r -f builds/release/linux-*
