@@ -404,9 +404,10 @@ Host .pki
 
 drop_down() {
   read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
-  /bin/env - /bin/bash --noprofile --rcfile <(echo source $rootless_path/tmp/env-rootless.exp; echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
-  echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
-  PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'\");
+  /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; echo source .identity; echo source .pinned_ver; \
+  echo source $rootless_path/tmp/env-rootless.exp; echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
+  echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; \
+  PS1='    $run_as@docker:~\$'; PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'\");
 }
 
 clean_some() {
@@ -665,8 +666,7 @@ fi
 
 docker-credential-pass erase &
 ssh-add -D && eval \"\$(ssh-agent -k)\"
-clean_some
-sys_ctl_common"
+clean_some && sys_ctl_common"
 
 if [ "$TEST" = "yes" ]; then
   chown root:root $nulled
