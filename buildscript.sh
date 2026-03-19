@@ -433,7 +433,7 @@ subver() {
 }
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
-  chmod +x .pki/local.sh && ./.pki/local.sh \$1 || exit 1
+  chmod +x .pki/local.sh && ./.pki/local.sh \$1 \$DEVICEFLOW_AUTH || exit 1
 }
 
 docker() {
