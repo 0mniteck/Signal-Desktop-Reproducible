@@ -73,7 +73,7 @@ if [[ "$run_id" == "" ]]; then
     runm="exec pkexec --keep-cwd '$0' '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$(id -u)'"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
-      exec asciinema rec --overwrite -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$runm"
+      exec asciinema rec --overwrite -i 3 -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$runm"
     else
       $runm
     fi
