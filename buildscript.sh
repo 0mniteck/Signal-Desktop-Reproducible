@@ -41,14 +41,14 @@ else
   touch $nulled
   chown root:root $nulled
   echo "
-  Cross Compile: $CROSS
-  Increment: $INC
-  Override Source Epoch: $EPOCH
-  Mount: /dev/$MOUNT
-  Push to Branch: $BRANCH
-  Tag Release: $TAG
-  Run Tests: $TEST
-" >> $nulled
+Cross Compile: $CROSS
+Increment: $INC
+Override Source Epoch: $EPOCH
+Mount: /dev/$MOUNT
+Push to Branch: $BRANCH
+Tag Release: $TAG
+Run Tests: $TEST
+"
 fi
 
 $debug
@@ -247,6 +247,7 @@ pushd $docker_data > /dev/null
   chown $run_as:$run_as $save_id
 popd > /dev/null
 
+echo 'Running as user: '$run_as' UID: '$run_id
 machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $PWD
@@ -255,13 +256,10 @@ mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- \
-SKIP_LOGIN=$SKIP_LOGIN PUSH=$PUSH PATH=$PATH \
-HOME=$HOME CROSS=$CROSS EPOCH=$EPOCH INC=$INC \
-MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
-DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
-XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/bin/tty) \
-SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
-RESULTS=$RESULTS \
+BRANCH=$BRANCH CROSS=$CROSS DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
+EPOCH=$EPOCH GPG_TTY=\$(/bin/tty) HOME=$HOME INC=$INC MOUNT=$MOUNT PATH=$PATH \
+PUSH=$PUSH RESULTS=$RESULTS SKIP_LOGIN=$SKIP_LOGIN SSH_CONF=\$(<$HOME/.ssh/config) \
+TAG=$TAG TERM=$TERM TEST=$TEST XDG_RUNTIME_DIR=$RUN_DIR \
 || exit 1
 
 eval \"\$(ssh-agent -s)\" >> $nulled && wait
@@ -522,7 +520,7 @@ rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\
 sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
 echo -e \"Setting rel_date from today's date: \$rel_date\n\" && TRIPL=\$REPO/\$MODULE:\$rel_date
 
-mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
+mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << __EOF
@@ -596,12 +594,12 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
     echo Installed at: $local_bin/pass && \
     cp \$(which gpg) $local_bin/gpg && \
     echo Installed at: $local_bin/gpg && \
-    cp /lib/$uname-linux-gnu/libassuan.so.9* $local_lib/$uname-linux-gnu/ && \
-    echo Installed at: $local_lib/$uname-linux-gnu/libassuan.so.9 || exit 1
+    cp /lib/$uname-$OSTYPE/libassuan.so.9* $local_lib/$uname-$OSTYPE/ && \
+    echo Installed at: $local_lib/$uname-$OSTYPE/libassuan.so.9 || exit 1
   fi
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-linux-gnu ; docker login' || exit 1
+  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-$OSTYPE ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store || exit 1
   mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
@@ -627,8 +625,7 @@ fi
 
 rm -r -f Results && mkdir -p $results
 pushd $results > /dev/null
-  rm -r -f *
-  mkdir -p arm64 amd64 source env
+  rm -r -f * && mkdir -p arm64 amd64 source env
   pushd env > /dev/null
     save_id=$run_id:$run_id.env
     set > \$save_id
@@ -700,5 +697,4 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
-
 exit 0
