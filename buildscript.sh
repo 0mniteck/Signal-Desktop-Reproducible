@@ -313,9 +313,10 @@ syfted() { # \$1 = name
 
 attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
   if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+    src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     read -p \"🔐 Press enter to start attestation for \$2\" && echo -e '\nStarting Syft...\n'
     touch .pager1 && tail -f .pager1 & pid1=\$!
-    syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
+    syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$src \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
     kill \$pid1 && rm -f .pager1 && echo || exit 1
     sleep 5
