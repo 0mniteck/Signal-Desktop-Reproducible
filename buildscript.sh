@@ -143,7 +143,7 @@ clean_all() {
   clean_most
   rm -r -f $var_docker/
   rm -r -f /usr/libexec/docker/
-  rm -r -f /var/lib/snapd/cache/*
+  # rm -r -f /var/lib/snapd/cache/*
 }
 
 unmount() {
@@ -232,6 +232,7 @@ if [ "$MOUNT" != "" ]; then
 fi
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
+  rootless_path=$home/rootless
 else
   declare -- PUSH='"--push"'
 fi
@@ -530,7 +531,7 @@ $debug
 export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
 rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp \
-/bin/env - /bin/bash --norc --noprofile -i -c '
+/bin/bash --norc --noprofile -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
@@ -555,8 +556,8 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
 --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
---exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/env - /bin/bash --norc --noprofile | \
-/bin/env - /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
+--exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
+/bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
 rm -f $rootless_path/env-*
 __EOF
 
