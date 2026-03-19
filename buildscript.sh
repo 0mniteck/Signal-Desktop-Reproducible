@@ -143,7 +143,7 @@ clean_all() {
   clean_most
   rm -r -f $var_docker/
   rm -r -f /usr/libexec/docker/
-  # rm -r -f /var/lib/snapd/cache/*
+  rm -r -f /var/lib/snapd/cache/*
 }
 
 unmount() {
