@@ -30,7 +30,7 @@ ver_split() {
 ver_split
 
 pushd $RESULTS > /dev/null
-  echo 'Starting cosign...' && mkdir -p source && pushd source > /dev/null
+  echo 'Starting cosign...' && pushd source > /dev/null
   cosign_run_src="script -q -c 'cosign verify-attestation $source_loc \
     --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity $SIGSTORE_USR \
     --type spdxjson > source.sig.bundle' /dev/null > source.attested"
@@ -70,8 +70,8 @@ else
 fi
     for A in arm64 amd64; do
       scan_using_grype $MODULE $TRIPL $A
-    done
-  popd > /dev/null && unset A
+    done && unset A
+  popd > /dev/null
 
 docker run -it --cpus=$(nproc) \
   --network=name=host,\"driver-opt=network=host\" \
