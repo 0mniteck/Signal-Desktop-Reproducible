@@ -21,9 +21,9 @@ ver_split() {
     sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g readme.md
     sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g Dockerfile
     sed -i s/last_ver_num=$last_ver_num/last_ver_num=$ver_split/g .pinned_ver
-    echo "Version Incremented From v$last_ver_num To v$ver_split"
+    echo -e "Version Incremented: From v$last_ver_num To v$ver_split\nTarget Branch: $ver_num.x\n"
   else
-    echo "Version v$ver_split"
+    echo -e "Version: v$ver_split\nTarget Branch: $ver_num.x\n"
   fi
 }
 
