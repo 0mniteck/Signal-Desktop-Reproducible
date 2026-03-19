@@ -348,7 +348,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
         --type spdxjson > \$1.sig.bundle' /dev/null > \$1.attested\"
       quiet \$cosign_run || quiet \$cosign_run || exit 1
       cat \$1.attested && popd > /dev/null
-    done
+    done && unset arr
   else
     echo 'Skipping Attestations: Docker Hub: not logged in...'
   fi
@@ -655,7 +655,8 @@ pushd $results > /dev/null
   scan_using_grype ubuntu \"/ --select-catalogers directory\"
   touch readme.md && cat */*.vulns >> readme.md && cat *.vulns >> readme.md
   sed -i 's/^/#### /g' readme.md && echo '\`\`\`' >> readme.md
-  cat */*.image.digest >> readme.md && cat readme.md && echo
+  cat index.digest >> readme.md && cat */*.manifest.digest >> readme.md
+  cat readme.md && echo
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
