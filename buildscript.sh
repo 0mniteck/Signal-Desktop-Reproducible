@@ -90,8 +90,8 @@ else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
-RUN_DIR=$run_dir
-home=$HOME; path=$PATH
+RUN_DIR=$run_dir; RESULTS=results
+home=$HOME; path=$PATH; results=$RESULTS
 local_data=$home/.local
 local_bin=$home/docker/bin
 local_lib=$home/docker/lib
@@ -261,6 +261,7 @@ MOUNT=$MOUNT BRANCH=$BRANCH TAG=$TAG TEST=$TEST \
 DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
 XDG_RUNTIME_DIR=$RUN_DIR GPG_TTY=\$(/bin/tty) \
 SSH_CONF=\$(<$HOME/.ssh/config) TERM=$TERM \
+RESULTS=$RESULTS \
 || exit 1
 
 eval \"\$(ssh-agent -s)\" >> $nulled && wait
@@ -311,41 +312,45 @@ syfted() { # \$1 = name
 }
 
 attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
-  read -p \"🔐 Press enter to start attestation for \$2\" && echo -e '\nStarting Syft...\n'
-  touch .pager1 && tail -f .pager1 & pid1=\$!
-  syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
-  quiet \$syft_att_run || quiet \$syft_att_run || exit 1
-  kill \$pid1 && rm -f .pager1 && echo || exit 1
-  sleep 5
-  
-  echo \$2@\$(cat \$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g') > \$1.index.digest
-  docker buildx imagetools inspect --format '{{ json .Provenance }}' docker.io/\$2 > \$1.provenance.json
-  docker buildx imagetools inspect --format '{{ .Manifest }}' docker.io/\$2 > \$1.manifest.md
-  jsin=<(docker buildx imagetools inspect --format '{{ json . }}' docker.io/\$2) 
-  digest1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].digest | cut -d'\"' -f2)
-  arr1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].platform.architecture | cut -d'\"' -f2)
-  digest2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].digest | cut -d'\"' -f2)
-  arr2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].platform.architecture | cut -d'\"' -f2)
-  
-  att1=\$(echo \$(cat <(\$jsin) | jq .manifest.manifests.[2].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
-  att2=\$(echo \$(cat <(\$jsin) | jq .manifest.manifests.[3].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
-  img_name=\$(cat <(\$jsin) | jq .name | cut -d'\"' -f2)
-  
-  if [[ \"\$digest1\" == \"\$att1\" ]]; then
-    echo \$img_name@\$digest1 > \$arr1/\$1.manifest.digest
+  if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+    read -p \"🔐 Press enter to start attestation for \$2\" && echo -e '\nStarting Syft...\n'
+    touch .pager1 && tail -f .pager1 & pid1=\$!
+    syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
+    quiet \$syft_att_run || quiet \$syft_att_run || exit 1
+    kill \$pid1 && rm -f .pager1 && echo || exit 1
+    sleep 5
+    
+    echo \$2@\$(cat \$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g') > \$1.index.digest
+    docker buildx imagetools inspect --format '{{ json .Provenance }}' docker.io/\$2 > \$1.provenance.json
+    docker buildx imagetools inspect --format '{{ .Manifest }}' docker.io/\$2 > \$1.manifest.md
+    jsin=<(docker buildx imagetools inspect --format '{{ json . }}' docker.io/\$2) 
+    digest1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].digest | cut -d'\"' -f2)
+    arr1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].platform.architecture | cut -d'\"' -f2)
+    digest2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].digest | cut -d'\"' -f2)
+    arr2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].platform.architecture | cut -d'\"' -f2)
+    
+    att1=\$(echo \$(cat <(\$jsin) | jq .manifest.manifests.[2].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
+    att2=\$(echo \$(cat <(\$jsin) | jq .manifest.manifests.[3].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
+    img_name=\$(cat <(\$jsin) | jq .name | cut -d'\"' -f2)
+    
+    if [[ \"\$digest1\" == \"\$att1\" ]]; then
+      echo \$img_name@\$digest1 > \$arr1/\$1.manifest.digest
+    fi
+    if [[ \"\$digest2\" == \"\$att2\" ]]; then
+      echo \$img_name@\$digest2 > \$arr2/\$1.manifest.digest
+    fi
+    
+    for arr in \$arr1 \$arr2; do
+      echo 'Starting Cosign...' && pushd \$arr > /dev/null
+      cosign_run=\"script -q -c 'cosign verify-attestation docker.io/\$(cat \$1.manifest.digest) \
+        --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity \$SIGSTORE_USR \
+        --type spdxjson > \$1.sig.bundle' /dev/null > \$1.attested\"
+      quiet \$cosign_run || quiet \$cosign_run || exit 1
+      cat \$1.attested && popd > /dev/null
+    done
+  else
+    echo 'Skipping Attestations: Docker Hub: not logged in...'
   fi
-  if [[ \"\$digest2\" == \"\$att2\" ]]; then
-    echo \$img_name@\$digest2 > \$arr2/\$1.manifest.digest
-  fi
-  
-  for arr in \$arr1 \$arr2; do
-    echo 'Starting Cosign...'
-    cosign_run=\"script -q -c 'cosign verify-attestation docker.io/\$(cat \$arr/\$1.manifest.digest) \
-      --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity \$SIGSTORE_USR \
-      --type spdxjson > \$arr/\$1.sig.bundle' /dev/null > \$arr/\$1.attested\"
-    quiet \$cosign_run || quiet \$cosign_run || exit 1
-    cat \$arr/\$1.attested
-  done
 }
 
 scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64 or arm64)
@@ -377,7 +382,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
   popd > /dev/null
   else
-    echo 'Skipping Syft, Grype, and Attestations: Docker Hub: not logged in...'
+    echo 'Skipping Syft and Grype: Docker Hub: not logged in...'
   fi
 }
 
@@ -400,7 +405,7 @@ Host .pki
 
 drop_down() {
   read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
-  /bin/env - /bin/bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); echo 'docker() { echd=\"\$@\"; \$docker \$echd; }'; \
+  /bin/env - /bin/bash --noprofile --rcfile <( cat <( declare -p | grep -- -- ); echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
   echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1=\$PS1; declare -p | grep TEST; declare -p | grep SKIP; \
   PROMPT_COMMAND='echo -e \\\\nRootless~Docker:~\$'\")
 }
@@ -436,8 +441,8 @@ docker() {
 }
 
 quiet() {
-  echt=\"\$@\"
-  script -a -q -c \"\$echt\" $nulled >> $nulled
+  echq=\"\$@\"
+  script -a -q -c \"\$echq\" $nulled >> $nulled
 }
 
 confirm() { # \$1 = subject
@@ -496,25 +501,25 @@ elif [[ \"\$EPOCH\" != 0 ]]; then
   echo \"Using override timestamp \$EPOCH for SOURCE_DATE_EPOCH.\"
   source_date_epoch=\$((\$EPOCH))
 else
-  timestamp=\$(cat Results/release.sha512sum | grep Epoch | cut -d ' ' -f5)
+  timestamp=\$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)
   if [[ \"\$timestamp\" != \"\" ]]; then
-    echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \$(cat Results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\"
+    echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\"
     source_date_epoch=\$((timestamp))
     check_file=1
-    cp Results/release.sha512sum /tmp/release.last.sha512sum
+    cp $results/release.sha512sum /tmp/release.last.sha512sum
   else
     echo \"Can't get latest commit timestamp. Defaulting to 1.\"
     source_date_epoch=1
   fi
 fi
-export -- SOURCE_DATE_EPOCH=\$source_date_epoch
+export -- SOURCE_DATE_EPOCH=\$source_date_epoch source_date_epoch=\$source_date_epoch 
 
 unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
 sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
-echo -e \"Setting rel_date from today's date: \$rel_date\n\" && tripl=\$REPO/\$MODULE:\$rel_date
+echo -e \"Setting rel_date from today's date: \$rel_date\n\" && TRIPL=\$REPO/\$MODULE:\$rel_date
 
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-linux-gnu $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path.sh $rootless_path/env-{docker,rootless} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
@@ -526,27 +531,32 @@ export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && wait
 rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp /bin/bash -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless && rm -f $rootless_path/env-docker
-echo \"docker=$docker
-HOME=$home
-TERM=$term
-NO_COLOR=true
-XDG_CONFIG_HOME=$home
-XDG_RUNTIME_DIR=$run_dir
-DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
-DOCKER_TMPDIR=$docker_data/tmp
-DOCKER_CONFIG=$home/docker
-DOCKER_HOST=unix://$run_dir/docker.sock
-BUILDX_METADATA_PROVENANCE=max
-BUILDX_METADATA_WARNINGS=1
-BUILDX_GIT_LABELS=full
+pushd $docker_data > /dev/null
+  save_id=docker.env
+  set > \$save_id
+  env | sort >> \$save_id
+  declare >> \$save_id
+popd > /dev/null
+echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
 BUILDKIT_TTY_LOG_LINES=15
-BUILDKIT_MULTI_PLATFORM=true
+BUILDX_GIT_LABELS=full
+BUILDX_METADATA_PROVENANCE=max
+BUILDX_METADATA_WARNINGS=1
+DBUS_SESSION_BUS_ADDRESS=unix:path=$run_dir/bus
+DOCKER_CONFIG=$home/docker
+DOCKER_HOST=unix://$run_dir/docker.sock
+DOCKER_TMPDIR=$docker_data/tmp
+GRYPE_DB_CACHE_DIR=$docker_data/grype
+HOME=$home
+NO_COLOR=true
+PATH=$path:$docker_path:$home/docker/bin
 SOURCE_DATE_EPOCH=\$source_date_epoch
 SYFT_CACHE_DIR=$docker_data/syft
-GRYPE_DB_CACHE_DIR=$docker_data/grype
-PATH=$path:$docker_path:$home/docker/bin\" >> $rootless_path/env-rootless
-sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/env-rootless.exp
+TERM=$term
+XDG_CONFIG_HOME=$home
+XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
+sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
 --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
@@ -562,7 +572,7 @@ sys_ctl_common
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice --all --no-pager -n 150 > $rootless_path/docker.slice.log
 systemctl --user status docker.dockerd --all --no-pager -n 150 > $rootless_path/docker.dockerd.log
-source $rootless_path/env-rootless.exp && echo \"$rootless_path/env-rootless.exp sourced\" || exit 1
+source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
@@ -617,16 +627,21 @@ else
   subver \$sub_ver
 fi
 
-pushd Results > /dev/null
-  rm -f *.*
-  save_id=$run_id:$run_id.env
-  set > \$save_id
-  env | sort >> \$save_id
-  declare >> \$save_id
-  mv $docker_data/0:0.env 0:0.env
-  quiet '$docker version > docker.info'
-  echo >> docker.info
-  quiet '$docker info >> docker.info'
+rm -r -f Results && mkdir -p $results
+pushd $results > /dev/null
+  rm -r -f *
+  mkdir -p arm64 amd64 source env
+  pushd env > /dev/null
+    save_id=$run_id:$run_id.env
+    set > \$save_id
+    env | sort >> \$save_id
+    declare >> \$save_id
+    mv $docker_data/0:0.env 0:0.env
+    mv $docker_data/docker.env docker.env
+    quiet '$docker version > docker.info'
+    echo -e 'Info:\n' >> docker.info
+    quiet '$docker info >> docker.info'
+  popd > /dev/null
 popd > /dev/null
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
@@ -635,7 +650,7 @@ else
   drop_down || exit 1
 fi
 
-pushd Results > /dev/null
+pushd $results > /dev/null
   scan_using_grype ubuntu \"/ --select-catalogers directory\"
   touch readme.md && cat */*.vulns >> readme.md && cat *.vulns >> readme.md
   sed -i 's/^/#### /g' readme.md && echo '\`\`\`' >> readme.md
