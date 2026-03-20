@@ -168,8 +168,10 @@ clean_all() {
 unmount() {
   quiet snap disable docker && sleep 1
   if [[ -d $docker_data ]]; then
-    quiet kill $(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2) && \
-    rm -r -f $docker_data/* && sync
+    lsofd=$(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2)
+    if [[ "$lsofd" -ge 0 ]]; then
+      quiet kill $lsofd && rm -r -f $docker_data/* && sync
+    fi
   fi
   quiet umount $docker_data && sleep 1
   quiet systemd-cryptsetup detach $module && sleep 1
@@ -716,8 +718,10 @@ quiet networkctl delete docker0
 systemd_ctl_common
 
 if [[ -d $home/$snap_path ]]; then
-  quiet kill $(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2) && \
-  rm -r -f $home/$snap_path/* && sync
+  lsofd2=$(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
+  if [[ "$lsofd2" -ge 0 ]]; then
+    quiet kill $lsofd2 && rm -r -f $home/$snap_path/* && sync
+  fi
 fi
 
 snap remove syft --purge
