@@ -54,6 +54,7 @@ if [ "$TEST" = "" ]; then
   TEST="no"
   debug="set -eo pipefail"
   nulled=/dev/null
+  runme=$RUNME
 else
   TEST="yes"
   SKIP_LOGIN="yes"
@@ -61,6 +62,17 @@ else
   nulled=/tmp/nulled.log
   touch $nulled
   chown root:root $nulled
+  systemd-run -t \
+  -p DynamicUser=true \
+  -p ReadWritePaths=/home/root \
+  /bin/env - /bin/bash --norc --noprofile"
+    runme=\$(whoami)
+    echo \$runme
+    ls -la && df -h && \
+    ls -la / && \
+    ls -la /home/shant
+    read -p waiting"
+  runme=$RUNME
   echo "
 Cross Compile: $CROSS
 Increment: $INC
