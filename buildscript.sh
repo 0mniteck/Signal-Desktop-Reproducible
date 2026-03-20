@@ -3,7 +3,7 @@
 
 usage() {
   cat <<_EOF
-Usage: $PWD/./$0 [-c yes|no] [-d epoch] [-i .version] \
+Usage: $PWD/$0 [-c yes|no] [-d epoch] [-i .version] \
 [-m <device>] [-p <branch>] [-r <tag>] [-t yes|no]
 Maintainers: @0mniteck
 Options:
@@ -19,6 +19,8 @@ _EOF
 }
 
 GETOPT=$(which getopt)
+PRESERVED=$(echo "$@")
+eval echo "$PRESERVED" > /dev/null
 LONG="\
 _run_me::,\
 cross-compile::,\
@@ -42,7 +44,7 @@ while true; do
     --_run_me)           run_me="$2"; shift 2 ;;
     -h|--help)                  usage; exit 0 ;;
     --)                          shift; break ;;
-    *) echo "Internal error: $@" >&2;  exit 3 ;;
+    *) echo "Internal error: '$PRESERVED'" >&2;  exit 3 ;;
   esac
 done
 
@@ -87,10 +89,10 @@ amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
-    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $PWD/./$0'\n" && exit 1
+    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $PWD/$0'\n" && exit 1
   else
-    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $PWD/./$0'\n"
-    argv_run="exec pkexec --keep-cwd '$0' '--_run_me' '$(id -u)' '$@'"
+    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $PWD/$0'\n"
+    argv_run="exec pkexec --keep-cwd '$0' '--_run_me $(id -u) $PRESERVED'"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
       exec asciinema rec --overwrite -i 3 -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$argv_run"
