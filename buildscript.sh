@@ -54,37 +54,15 @@ if [ "$TEST" = "" ]; then
   TEST="no"
   debug="set -eo pipefail"
   nulled=/dev/null
-  runme=$RUNME
 else
   TEST="yes"
   SKIP_LOGIN="yes"
   debug="set -vx"
   nulled=/tmp/nulled.log
-  touch $nulled
-  chown root:root $nulled
-  systemd-run -t \
-  -p DynamicUser=true \
-  -p ReadWritePaths=/home/root \
-  /bin/env - /bin/bash --norc --noprofile -c "
-    runme=\$(whoami)
-    echo \$runme
-    ls -la && df -h && \
-    ls -la / && \
-    ls -la /home/shant
-    read -p waiting"
-  runme=$RUNME
-  echo "
-Cross Compile: $CROSS
-Increment: $INC
-Override Source Epoch: $EPOCH
-Mount: /dev/$MOUNT
-Push to Branch: $BRANCH
-Tag Release: $TAG
-Run Tests: $TEST
-"
 fi
 
 $debug
+runme=$RUNME
 run_id=$runme
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
@@ -111,6 +89,21 @@ if [[ "$run_id" == "" ]]; then
       $argv_run
     fi
   fi
+fi
+
+if [ "$TEST" = "yes" ]; then
+  touch $nulled
+  chown root:root $nulled
+  echo "
+Cross Compile: $CROSS
+Increment: $INC
+Override Source Epoch: $EPOCH
+Mount: /dev/$MOUNT
+Push to Branch: $BRANCH
+Tag Release: $TAG
+Run Tests: $TEST
+Run Level: $RUNME
+"
 fi
 
 if [[ "$(uname -m)" == "aarch64" ]]; then
