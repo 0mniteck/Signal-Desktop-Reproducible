@@ -2,9 +2,10 @@
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 
 usage() {
-  cat <<EOF
+  cat <<_EOF
 Usage: $PWD/./$0 [-c yes|no] [-d epoch] [-i .version] \
 [-m <device>] [-p <branch>] [-r <tag>] [-t yes|no]
+
 Options:
   -c, --cross-compile <yes|no> Cross compile arm64 or amd64
   -d, --date <epoch>           Source date epoch/'today'
@@ -14,7 +15,7 @@ Options:
   -r, --release-tag <name>     Release tag (ex. 8.44.0)
   -t, --tests <yes|no>         Skip Docker/Github login
   -h, --help                   Show this help
-EOF
+_EOF
 }
 
 GETOPT=$(which getopt)
@@ -333,10 +334,10 @@ syfted() { # \$1 = name
 
 attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
   if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
-    src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
+    src_att=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     read -p \"🔐 Press enter to start attestation for \$2\" && echo -e '\nStarting Syft...\n'
     touch .pager1 && tail -f .pager1 & pid1=\$!
-    syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$src \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
+    syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$src_att \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
     kill \$pid1 && rm -f .pager1 && echo || exit 1
     
@@ -485,6 +486,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   
   git remote remove origin && git remote add origin git@\$MODULE:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
+  
   confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
   git fetch --unshallow 2>> $nulled
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
