@@ -20,31 +20,30 @@ _EOF
 
 GETOPT=$(which getopt)
 PRESERVED=$(echo "$@")
-eval echo "$PRESERVED" > /dev/null
 LONG="\
-_run_me::,\
-cross-compile::,\
-date::,increment::,\
-mount::,push-branch::,\
-release-tag::,tests::,help::"
-SHORT="c::d::i::m::p::r::t::h::"
-PARSED=$($GETOPT -n "$0" -o "$SHORT" \
--l "$LONG" -- "$@") || { usage; exit 2; }
-eval set -- "$PARSED"
+runme:,\
+cross-compile:,\
+date:,increment:,\
+mount:,push-branch:,\
+release-tag:,tests:,help::"
+SHORT="c:d:i:m:p:r:t:e:h::"
+PARSED=$(POSIXLY_CORRECT=yes $GETOPT --name "$0" -u \
+--longoptions "$LONG" --options "$SHORT" -- "$@") && \
+eval echo "$PARSED" > /dev/null || { usage; exit 2; }
 
-while true; do
+while [[ "$1" != '' ]]; do
   case "$1" in
     -c|--cross-compile)  CROSS="$2";  shift 2 ;;
     -d|--date)           EPOCH="$2";  shift 2 ;;
-    -i|--increment)      INC="$2";    shift 2 ;;
+    -i|--increment)        INC="$2";  shift 2 ;;
     -m|--mount)          MOUNT="$2";  shift 2 ;;
-    -p|--push-branch)    BRANCH="$2"; shift 2 ;;
-    -r|--release-tag)    TAG="$2";    shift 2 ;;
-    -t|--tests)          TEST="$2";   shift 2 ;;
-    --_run_me)           run_me="$2"; shift 2 ;;
-    -h|--help)                  usage; exit 0 ;;
-    --)                          shift; break ;;
-    *) echo "Internal error: '$PRESERVED'" >&2;  exit 3 ;;
+    -p|--push-branch)   BRANCH="$2";  shift 2 ;;
+    -r|--release-tag)      TAG="$2";  shift 2 ;;
+    -t|--tests)           TEST="$2";  shift 2 ;;
+    -e|--runme)          RUNME="$2";  shift 2 ;;
+    -h|--help)                usage;   exit 0 ;;
+     -|--)                              shift ;;
+     *|**) echo "Unknown error" >&2;   exit 3 ;;
   esac
 done
 
@@ -74,7 +73,7 @@ Run Tests: $TEST
 fi
 
 $debug
-run_id=$run_me
+run_id=$runme
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
@@ -92,7 +91,7 @@ if [[ "$run_id" == "" ]]; then
     echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1
   else
     echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n"
-    argv_run="exec pkexec --keep-cwd '$0' --_run_me $(id -u) $PRESERVED"
+    argv_run="exec pkexec --keep-cwd '$0' --runme $(id -u) $PRESERVED"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
       exec asciinema rec --overwrite -i 3 -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$argv_run"
@@ -738,5 +737,4 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
-
 exit 0
