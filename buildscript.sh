@@ -141,6 +141,7 @@ sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
 Type=exec\\
 Group=$run_as\\
+ExitType=cgroup\\
 Slice=docker.slice\\
 _EOF__
 )
