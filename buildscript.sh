@@ -609,9 +609,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install amd64
+  docker run --privileged --rm $binfmt_arm64 --install amd64
 elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.0.4-59 --install arm64
+  docker run --privileged --rm $binfmt_amd64 --install arm64
 else
   echo 'Unknown Architecture '\$(uname -m) && exit 1
 fi
