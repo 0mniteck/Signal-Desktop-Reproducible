@@ -143,7 +143,7 @@ clean_all() {
   clean_most
   rm -r -f $var_docker/
   rm -r -f /usr/libexec/docker/
-  # rm -r -f /var/lib/snapd/cache/*
+  rm -r -f /var/lib/snapd/cache/*
 }
 
 unmount() {
@@ -318,9 +318,8 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest \$src \$3 -o spdx-json docker.io/\$2' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
     kill \$pid1 && rm -f .pager1 && echo || exit 1
-    sleep 5
     
-    echo \$2@\$(cat \$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g') > \$1.index.digest
+    sleep 5 && echo \$2@\$(cat \$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g') > \$1.index.digest
     docker buildx imagetools inspect --format '{{ json .Provenance }}' docker.io/\$2 > \$1.provenance.json
     docker buildx imagetools inspect --format '{{ .Manifest }}' docker.io/\$2 > \$1.manifest.md
     jsin=<(docker buildx imagetools inspect --format '{{ json . }}' docker.io/\$2) 
@@ -533,6 +532,7 @@ mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootles
 rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp \
 /bin/bash --norc --noprofile -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
+
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
 BUILDKIT_TTY_LOG_LINES=$(($LINES - 15))
@@ -552,6 +552,7 @@ SYFT_CACHE_DIR=$docker_data/syft
 TERM=$term
 XDG_CONFIG_HOME=$home
 XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
+
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
@@ -638,6 +639,8 @@ pushd $results > /dev/null
     quiet '$docker version > docker.info'
     echo -e 'Info:\n' >> docker.info
     quiet '$docker info >> docker.info'
+    echo -e 'Info:\n' >> docker.info
+    quiet '$docker buildx version >> docker.info'
   popd > /dev/null
 popd > /dev/null
 
@@ -698,4 +701,5 @@ clean_all
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
 fi
+
 exit 0
