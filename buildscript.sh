@@ -587,20 +587,22 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mv \$cred_helper_name $local_bin/docker-credential-pass || exit 1
-    chmod +x $local_bin/docker-credential-pass && \
-    echo '{
-  \"credsStore\": \"pass\"
-}' > $home/docker/config.json && \
-    installed='which docker-credential-pass' && \
-    echo Installed at: \$(\$installed) && \
-    cp \$(which pass) $local_bin/pass && \
-    echo Installed at: $local_bin/pass && \
-    cp \$(which gpg) $local_bin/gpg && \
-    echo Installed at: $local_bin/gpg && \
-    cp /lib/$uname-$OSTYPE/libassuan.so.9* $local_lib/$uname-$OSTYPE/ && \
-    echo Installed at: $local_lib/$uname-$OSTYPE/libassuan.so.9 || exit 1
+    mv \$cred_helper_name $local_bin/docker-credential-pass && \
+    chmod +x $local_bin/docker-credential-pass || exit 1
+  else
+    cp \$(which docker-credential-pass) $local_bin/docker-credential-pass || exit 1
   fi
+  echo '{
+  \"credsStore\": \"pass\"
+}' > $home/docker/config.json
+  installed='which docker-credential-pass' && \
+  echo Installed at: \$(\$installed) && \
+  cp \$(which pass) $local_bin/pass && \
+  echo Installed at: $local_bin/pass && \
+  cp \$(which gpg) $local_bin/gpg && \
+  echo Installed at: $local_bin/gpg && \
+  cp /lib/$uname-$OSTYPE/libassuan.so.9* $local_lib/$uname-$OSTYPE/ && \
+  echo Installed at: $local_lib/$uname-$OSTYPE/libassuan.so.9 || exit 1
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-$OSTYPE ; docker login' || exit 1
@@ -610,9 +612,9 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
 fi
 
 if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-  docker run --privileged --rm $binfmt_arm64 --install amd64
+  docker run --privileged --rm \$binfmt_arm64 --install amd64
 elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-  docker run --privileged --rm $binfmt_amd64 --install arm64
+  docker run --privileged --rm \$binfmt_amd64 --install arm64
 else
   echo 'Unknown Architecture '\$(uname -m) && exit 1
 fi
