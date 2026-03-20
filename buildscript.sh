@@ -5,7 +5,7 @@ usage() {
   cat <<_EOF
 Usage: $PWD/./$0 [-c yes|no] [-d epoch] [-i .version] \
 [-m <device>] [-p <branch>] [-r <tag>] [-t yes|no]
-
+Maintainers: @0mniteck
 Options:
   -c, --cross-compile <yes|no> Cross compile arm64 or amd64
   -d, --date <epoch>           Source date epoch/'today'
