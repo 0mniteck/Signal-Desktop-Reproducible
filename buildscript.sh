@@ -393,6 +393,7 @@ Host \$MODULE
   IdentityFile $home/\$IDENTITY_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config
   fi
+  
   if [[ \"\$SSH_CONF\" != *.pki* ]]; then
     echo \"
 Host .pki
@@ -512,13 +513,13 @@ else
     source_date_epoch=1
   fi
 fi
-export -- SOURCE_DATE_EPOCH=\$source_date_epoch source_date_epoch=\$source_date_epoch 
 
 unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
 sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
+export -- SOURCE_DATE_EPOCH=\$source_date_epoch source_date_epoch=\$source_date_epoch 
 echo -e \"Setting rel_date from today's date: \$rel_date\n\" && TRIPL=\$REPO/\$MODULE:\$rel_date
 
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
@@ -636,11 +637,15 @@ pushd $results > /dev/null
     declare >> \$save_id
     mv $docker_data/0:0.env 0:0.env
     cp $rootless_path/env-docker docker.env
+    
+    echo -e '\nDocker Version:\n' >> docker.info
     quiet '$docker version > docker.info'
     echo -e '\nDocker Info:\n' >> docker.info
     quiet '$docker info >> docker.info'
     echo -e '\nBuildx Version:\n' >> docker.info
     quiet '$docker buildx version >> docker.info'
+    echo -e '\nBuildx Inspect:\n' >> docker.info
+    quiet '$docker buildx inspect --bootstrap >> docker.info'
   popd > /dev/null
 popd > /dev/null
 
