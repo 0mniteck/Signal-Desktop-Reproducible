@@ -12,7 +12,7 @@ Options:
   -m, --mount <device>         U2F backed LUKS partition
   -p, --push-branch <name>     Push branch (ex. 8.44.x)
   -r, --release-tag <name>     Release tag (ex. 8.44.0)
-  -t, --tests <yes|no>         Init verbose, skip login, dropdown shell
+  -t, --tests <yes|no>         Skip Docker/Github login
   -h, --help                   Show this help
 EOF
 }
@@ -25,22 +25,23 @@ date::,increment::,\
 mount::,push-branch::,\
 release-tag::,tests::,help::"
 SHORT="c::d::i::m::p::r::t::h::"
-PARSED=$($GETOPT -n "$0" -s bash -o "$SHORT" -l "$LONG" -- "$@") || { usage; exit 2; }
+PARSED=$($GETOPT -n "$0" -o "$SHORT" \
+-l "$LONG" -- "$@") || { usage; exit 2; }
 eval set -- "$PARSED"
 
 while true; do
   case "$1" in
-    -c|--cross-compile) CROSS="$2"; shift 2 ;;
-    -d|--date) EPOCH="$2"; shift 2 ;;
-    -i|--increment) INC="$2"; shift 2 ;;
-    -m|--mount) MOUNT="$2"; shift 2 ;;
-    -p|--push-branch) BRANCH="$2"; shift 2 ;;
-    -r|--release-tag) TAG="$2"; shift 2 ;;
-    -t|--tests) TEST="$2"; shift 2 ;;
-    --_run_me) run_me="$2"; shift 2;;
-    -h|--help) usage; exit 0 ;;
-    --) shift; break ;;
-    *) echo "Internal error while parsing options" >&2; exit 3 ;;
+    -c|--cross-compile)  CROSS="$2";  shift 2 ;;
+    -d|--date)           EPOCH="$2";  shift 2 ;;
+    -i|--increment)      INC="$2";    shift 2 ;;
+    -m|--mount)          MOUNT="$2";  shift 2 ;;
+    -p|--push-branch)    BRANCH="$2"; shift 2 ;;
+    -r|--release-tag)    TAG="$2";    shift 2 ;;
+    -t|--tests)          TEST="$2";   shift 2 ;;
+    --_run_me)           run_me="$2"; shift 2 ;;
+    -h|--help)                  usage; exit 0 ;;
+    --)                          shift; break ;;
+    *) echo "Internal error: $@" >&2;  exit 3 ;;
   esac
 done
 
@@ -194,7 +195,7 @@ apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ gh+ git-lfs+ gnupg2+ \
                                                                     gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ \
-                                                                    systemd-cryptsetup+ uidmap+ \
+                                                                    systemd-cryptsetup+ uidmap+ golang-docker-credential-helpers- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- || exit 1
 if [ "$MOUNT" != "" ]; then
     unmount
@@ -340,7 +341,8 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     sleep 5 && echo \$2@\$(cat \$1.meta.json | jq .[] | tail -n 2 | grep sha256 | sed 's/\"//g') > \$1.index.digest
     docker buildx imagetools inspect --format '{{ json .Provenance }}' docker.io/\$2 > \$1.provenance.json
     docker buildx imagetools inspect --format '{{ .Manifest }}' docker.io/\$2 > \$1.manifest.md
-    jsin=<(docker buildx imagetools inspect --format '{{ json . }}' docker.io/\$2) 
+    jsin=<(docker buildx imagetools inspect --format '{{ json . }}' docker.io/\$2)
+    
     digest1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].digest | cut -d'\"' -f2)
     arr1=\$(cat <(\$jsin) | jq .manifest.manifests.[0].platform.architecture | cut -d'\"' -f2)
     digest2=\$(cat <(\$jsin) | jq .manifest.manifests.[1].digest | cut -d'\"' -f2)
@@ -537,6 +539,7 @@ rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
 sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
+
 export -- SOURCE_DATE_EPOCH=\$source_date_epoch source_date_epoch=\$source_date_epoch 
 echo -e \"Setting rel_date from today's date: \$rel_date\n\" && TRIPL=\$REPO/\$MODULE:\$rel_date
 
@@ -545,8 +548,7 @@ touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless
 
 cat >> $rootless_path.sh << __EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
-$debug
-export -- HOME=$home PATH=$path TERM=$term
+$debug && export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
 rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp \
 /bin/bash --norc --noprofile -i -c '
