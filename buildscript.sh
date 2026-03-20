@@ -637,9 +637,9 @@ pushd $results > /dev/null
     mv $docker_data/0:0.env 0:0.env
     cp $rootless_path/env-docker docker.env
     quiet '$docker version > docker.info'
-    echo -e 'Info:\n' >> docker.info
+    echo -e '\nDocker Info:\n' >> docker.info
     quiet '$docker info >> docker.info'
-    echo -e 'Info:\n' >> docker.info
+    echo -e '\nBuildx Version:\n' >> docker.info
     quiet '$docker buildx version >> docker.info'
   popd > /dev/null
 popd > /dev/null
