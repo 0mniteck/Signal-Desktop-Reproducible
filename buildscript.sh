@@ -65,7 +65,7 @@ else
   systemd-run -t \
   -p DynamicUser=true \
   -p ReadWritePaths=/home/root \
-  /bin/env - /bin/bash --norc --noprofile"
+  /bin/env - /bin/bash --norc --noprofile -c "
     runme=\$(whoami)
     echo \$runme
     ls -la && df -h && \
