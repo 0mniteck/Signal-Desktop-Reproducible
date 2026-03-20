@@ -1,29 +1,46 @@
 #!/bin/env -S - /bin/bash --norc --noprofile
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 
-while getopts ":c:d:i:m:p:r:t:" opt; do
-  case $opt in
-  c) # Cross Compile: yes/No
-    CROSS="$OPTARG"
-    ;;
-  d) # Date: source_date_epoch
-    EPOCH="$OPTARG"
-    ;;
-  i) # Increment: .version
-    INC="$OPTARG"
-    ;;
-  m) # Mount Luks partition: mmcblk1p1
-    MOUNT="$OPTARG"
-    ;;
-  p) # Push-branch: debug
-    BRANCH="$OPTARG"
-    ;;
-  r) # Release-tag: tagname
-    TAG="$OPTARG"
-    ;;
-  t) # run-Tests: yes/No
-    TEST="$OPTARG"
-    ;;
+usage() {
+  cat <<EOF
+Usage: $PWD/./$0 [-c yes|no] [-d epoch] [-i .version] \
+[-m <device>] [-p <branch>] [-r <tag>] [-t yes|no]
+Options:
+  -c, --cross-compile <yes|no> Cross compile arm64 or amd64
+  -d, --date <epoch>           Source date epoch/'today'
+  -i, --increment <.version>   Increment version numbers
+  -m, --mount <device>         U2F backed LUKS partition
+  -p, --push-branch <name>     Push branch (ex. 8.44.x)
+  -r, --release-tag <name>     Release tag (ex. 8.44.0)
+  -t, --tests <yes|no>         Init verbose, skip login, dropdown shell
+  -h, --help                   Show this help
+EOF
+}
+
+GETOPT=$(which getopt)
+LONG="\
+_run_me::,\
+cross-compile::,\
+date::,increment::,\
+mount::,push-branch::,\
+release-tag::,tests::,help::"
+SHORT="c::d::i::m::p::r::t::h::"
+PARSED=$($GETOPT -n "$0" -s bash -o "$SHORT" -l "$LONG" -- "$@") || { usage; exit 2; }
+eval set -- "$PARSED"
+
+while true; do
+  case "$1" in
+    -c|--cross-compile) CROSS="$2"; shift 2 ;;
+    -d|--date) EPOCH="$2"; shift 2 ;;
+    -i|--increment) INC="$2"; shift 2 ;;
+    -m|--mount) MOUNT="$2"; shift 2 ;;
+    -p|--push-branch) BRANCH="$2"; shift 2 ;;
+    -r|--release-tag) TAG="$2"; shift 2 ;;
+    -t|--tests) TEST="$2"; shift 2 ;;
+    --_run_me) run_me="$2"; shift 2;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) echo "Internal error while parsing options" >&2; exit 3 ;;
   esac
 done
 
@@ -32,11 +49,12 @@ if [ "$CROSS" = "" ]; then
 fi
 if [ "$TEST" = "" ]; then
   TEST="no"
+  debug="set -eo pipefail"
   nulled=/dev/null
 else
   TEST="yes"
   SKIP_LOGIN="yes"
-  debug="set -x"
+  debug="set -vx"
   nulled=/tmp/nulled.log
   touch $nulled
   chown root:root $nulled
@@ -52,7 +70,7 @@ Run Tests: $TEST
 fi
 
 $debug
-run_id=$8
+run_id=$run_me
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
@@ -70,12 +88,12 @@ if [[ "$run_id" == "" ]]; then
     echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n" && exit 1
   else
     echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n"
-    runm="exec pkexec --keep-cwd '$0' '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$(id -u)'"
+    argv_run="exec pkexec --keep-cwd '$0' '--_run_me' '$(id -u)' '$@'"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
-      exec asciinema rec --overwrite -i 3 -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$runm"
+      exec asciinema rec --overwrite -i 3 -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$argv_run"
     else
-      $runm
+      $argv_run
     fi
   fi
 fi
