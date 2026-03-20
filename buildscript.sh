@@ -139,6 +139,7 @@ dockerd=${docker}d
 
 sed_ech=$(cat << _EOF__
 \\\\[Service\\\\]\\
+Type=exec\\
 Group=$run_as\\
 Slice=docker.slice\\
 _EOF__
@@ -276,7 +277,7 @@ pushd $docker_data > /dev/null
   chown $run_as:$run_as $save_id
 popd > /dev/null
 
-echo 'Running as user: '$run_as' UID: '$run_id
+echo 'Running as user: '$run_as' user_id: '$run_id:$run_id
 machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $PWD
