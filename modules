@@ -39,7 +39,7 @@ pushd $RESULTS > /dev/null
 popd > /dev/null
 
 docker buildx create \
-  --name $MODULE-builder --buildkitd-flags "--oci-worker-rootless=true" \
+  --name $MODULE-builder $CROSS --buildkitd-flags "--oci-worker-rootless=true" \
   --driver docker-container --driver-opt "network=host,default-load=true" --bootstrap --use
 
 if [[ "$last_rel_date" != "$rel_date" ]]; then
