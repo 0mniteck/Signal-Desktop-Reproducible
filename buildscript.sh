@@ -86,9 +86,9 @@ amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
-    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n" && exit 1
+    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $PWD/./$0'\n" && exit 1
   else
-    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd ./buildscript.sh'\n"
+    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $PWD/./$0'\n"
     argv_run="exec pkexec --keep-cwd '$0' '--_run_me' '$(id -u)' '$@'"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
@@ -549,9 +549,10 @@ touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless
 cat >> $rootless_path.sh << __EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug && export -- HOME=$home PATH=$path TERM=$term
-mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker && > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
-rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback --state-dir $rootless_path/tmp \
-/bin/bash --norc --noprofile -i -c '
+mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker
+> $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
+rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback \
+--state-dir $rootless_path/tmp /bin/bash --norc --noprofile -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
@@ -624,7 +625,8 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   echo Installed at: $local_lib/$uname-$OSTYPE/libassuan.so.9 || exit 1
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-$OSTYPE ; docker login' || exit 1
+  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; \
+  LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-$OSTYPE ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store || exit 1
   mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
@@ -686,9 +688,11 @@ popd > /dev/null
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git status && git add -A && git status && confirm 'git commit - git@ssh'
   if [ \"\$BRANCH\" != \"\" ]; then
-    git commit -a -S -m \"Successful Build of Release \$date_rel\" && git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
+    git commit -a -S -m \"Successful Build of Release \$date_rel\" && \
+    git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
     if [ \"\$TAG\" != \"\" ]; then
-      git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && git push origin \"refs/tags/\$TAG\"
+      git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && \
+      git push origin \"refs/tags/\$TAG\"
     fi
   fi
 fi
