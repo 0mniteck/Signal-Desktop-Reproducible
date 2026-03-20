@@ -3,9 +3,9 @@
 
 usage() {
   cat <<_EOF
-Usage: $PWD/$0 [-c yes|no] [-d epoch] [-i .version] \
+Usage: $0 [-c yes|no] [-d epoch] [-i .version] \
 [-m <device>] [-p <branch>] [-r <tag>] [-t yes|no]
-Maintainers: @0mniteck
+Maintainers: @0mniteck (Shant)
 Options:
   -c, --cross-compile <yes|no> Cross compile arm64 or amd64
   -d, --date <epoch>           Source date epoch/'today'
@@ -89,10 +89,10 @@ amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
-    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $PWD/$0'\n" && exit 1
+    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1
   else
-    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $PWD/$0'\n"
-    argv_run="exec pkexec --keep-cwd '$0' '--_run_me $(id -u) $PRESERVED'"
+    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n"
+    argv_run="exec pkexec --keep-cwd '$0' --_run_me $(id -u) $PRESERVED"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $run_home/.casts/$repo && \
       exec asciinema rec --overwrite -i 3 -t "$repo/$module:$rel_date" $run_home/.casts/$repo/$module:$rel_date.cast -c "$argv_run"
