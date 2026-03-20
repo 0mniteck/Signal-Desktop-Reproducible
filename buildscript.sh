@@ -595,8 +595,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   echo '{
   \"credsStore\": \"pass\"
 }' > $home/docker/config.json
-  installed='which docker-credential-pass' && \
-  echo Installed at: \$(\$installed) && \
+  echo Installed at: $local_bin/docker-credential-pass && \
   cp \$(which pass) $local_bin/pass && \
   echo Installed at: $local_bin/pass && \
   cp \$(which gpg) $local_bin/gpg && \
@@ -639,7 +638,6 @@ pushd $results > /dev/null
     declare >> \$save_id
     mv $docker_data/0:0.env 0:0.env
     cp $rootless_path/env-docker docker.env
-    
     echo -e '\nDocker Version:\n' >> docker.info
     quiet '$docker version > docker.info'
     echo -e '\nDocker Info:\n' >> docker.info
