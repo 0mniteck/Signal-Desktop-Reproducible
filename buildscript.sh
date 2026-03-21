@@ -168,7 +168,7 @@ clean_all() {
   rm -r -f $home/.docker/
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
-  clean_most || echo "Failed cleanup" && exit 1
+  clean_most || echo "Failed cleanup"
   rm -r -f $var_docker/
   rm -r -f /usr/libexec/docker/
   rm -r -f /var/lib/snapd/cache/*
@@ -204,7 +204,7 @@ if [[ "$MOUNT" != "" ]]; then
   unmount
 fi
 
-clean_all || echo "Failed cleanup" && exit 1
+clean_all || echo "Failed cleanup"
 
 apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ gh+ git-lfs+ gnupg2+ \
