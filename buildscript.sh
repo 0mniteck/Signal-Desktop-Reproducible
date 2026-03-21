@@ -484,7 +484,7 @@ confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
 
-clean_some || echo "Failed cleanup"
+clean_some || echo \"Failed cleanup\"
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
