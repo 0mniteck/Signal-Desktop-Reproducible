@@ -62,7 +62,7 @@ else
 fi
 
 $debug
-runme=$RUNME
+runm1e=$RUNME
 run_id=$runme
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
@@ -212,7 +212,7 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ golang-docker-credential-helpers- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- || \
-                                                                    echo "Failed apt install" && exit 1
+                                                                    echo "Failed apt install"
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
@@ -232,7 +232,7 @@ quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 
-clean_most || echo "Failed cleanup" && exit 1
+clean_most || echo "Failed cleanup"
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
 mkdir -p /$plugins_path && wait
@@ -484,7 +484,7 @@ confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
 
-clean_some || echo "Failed cleanup" && exit 1
+clean_some || echo "Failed cleanup"
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
@@ -723,7 +723,7 @@ if [ "$MOUNT" != "" ]; then
     unmount
 fi
 
-clean_all || echo "Failed cleanup" && exit 1
+clean_all || echo "Failed cleanup"
 quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime
 quiet systemctl unmask snap.docker.dockerd --runtime
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
@@ -742,7 +742,7 @@ snap remove grype --purge
 snap remove docker --purge 2>> $nulled && wait
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 
-clean_all || echo "Failed cleanup" && exit 1
+clean_all || echo "Failed cleanup"
 
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
