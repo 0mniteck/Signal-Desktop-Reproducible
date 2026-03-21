@@ -62,7 +62,7 @@ else
 fi
 
 $debug
-runm1e=$RUNME
+runme=$RUNME
 run_id=$runme
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
