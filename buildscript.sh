@@ -200,6 +200,10 @@ quiet() {
   script -a -q -c "$echt" $nulled >> $nulled
 }
 
+if [ "$MOUNT" != "" ]; then
+    unmount
+fi
+
 clean_all
 
 apt-get -qq update && apt-get -qq upgrade -y && \
@@ -208,10 +212,6 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ golang-docker-credential-helpers- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- || exit 1
-if [ "$MOUNT" != "" ]; then
-    unmount
-fi
-
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
