@@ -18,7 +18,7 @@ Options:
 _EOF
 }
 
-GETOPT=$(which getopt)
+GETOPT=$(which getopt || exit 1) 
 PRESERVED=$(echo "$@")
 LONG="\
 runme:,\
@@ -47,10 +47,10 @@ while [[ "$1" != '' ]]; do
   esac
 done
 
-if [ "$CROSS" = "" ]; then
+if [[ "$CROSS" == "" ]]; then
   CROSS="yes"
 fi
-if [ "$TEST" = "" ]; then
+if [[ "$TEST" == "" ]]; then
   TEST="no"
   debug="set -eo pipefail"
   nulled=/dev/null
@@ -91,7 +91,7 @@ if [[ "$run_id" == "" ]]; then
   fi
 fi
 
-if [ "$TEST" = "yes" ]; then
+if [[ "$TEST" == "yes" ]]; then
   touch $nulled
   chown root:root $nulled
   echo "
@@ -200,18 +200,19 @@ quiet() {
   script -a -q -c "$echt" $nulled >> $nulled
 }
 
-if [ "$MOUNT" != "" ]; then
-    unmount
+if [[ "$MOUNT" != "" ]]; then
+  unmount
 fi
 
-clean_all
+clean_all || echo "Failed cleanup" && exit 1
 
 apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ gh+ git-lfs+ gnupg2+ \
                                                                     gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ \
                                                                     systemd-cryptsetup+ uidmap+ golang-docker-credential-helpers- \
-                                                                    docker- docker.io- docker-ce- docker-ce-cli- || exit 1
+                                                                    docker- docker.io- docker-ce- docker-ce-cli- || \
+                                                                    echo "Failed apt install" && exit 1
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
@@ -231,7 +232,7 @@ quiet systemctl mask snap.docker.dockerd --runtime --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
 
-clean_most
+clean_most || echo "Failed cleanup" && exit 1
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
 mkdir -p /$plugins_path && wait
@@ -255,18 +256,18 @@ if [[ "$SKIP_LOGIN" == "" ]]; then
   quiet $set_facl || quiet $set_facl || exit 1
 fi
 
-if [ "$MOUNT" != "" ]; then
+if [[ "$MOUNT" != "" ]]; then
   systemd-cryptsetup attach $module /dev/$MOUNT && sleep 1 && echo
   mount /dev/mapper/$module $docker_data && sleep 1
   rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
 fi
-if [ "$TEST" = "yes" ]; then
+if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled
   rootless_path=$home/rootless
 else
   declare -- PUSH='"--push"'
 fi
-if [ "$CROSS" = "yes" ]; then
+if [[ "$CROSS" == "yes" ]]; then
   declare -- CROSS='"--platform linux/arm64,linux/amd64"'
 fi
 
@@ -278,8 +279,8 @@ pushd $docker_data > /dev/null
   chown $run_as:$run_as $save_id
 popd > /dev/null
 
-echo 'Running as user: '$run_as' user_id: '$run_id:$run_id
-machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
+echo 'Running as user: '$run_as' - user_id:group_id '$run_id:$run_id
+systemd-cat -t USR_RNLVL -p debug machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $PWD
 
@@ -435,11 +436,12 @@ Host .pki
 }
 
 drop_down() {
-  read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
+  set +x; set +v; read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
   /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; echo source .identity; echo source .pinned_ver; \
   echo source $rootless_path/tmp/env-rootless.exp; echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; \
   echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; \
-  PS1='    $run_as@docker:~\$'; PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'\");
+  PS1='    $run_as@docker:~\$'; PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'; \
+  HOME=$HOME; PATH=$PATH; TERM=$TERM;\"); set -xv;
 }
 
 clean_some() {
@@ -481,13 +483,13 @@ confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
 
-clean_some
+clean_some || echo "Failed cleanup" && exit 1
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
   chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub && \
   chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub || exit 1
-  ssh_config && ssh -T git@github.com 2>> $nulled
+  echo "Starting SSH config." && ssh_config && ssh -T git@github.com 2>> $nulled
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE && \
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE && \
   echo && ssh-add -l && echo || exit 1
