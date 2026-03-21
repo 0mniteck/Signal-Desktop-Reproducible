@@ -168,7 +168,7 @@ clean_all() {
   rm -r -f $home/.docker/
   rm -r -f $data_dir/rootless*
   rm -r -f $data_dir/systemd/
-  clean_most
+  clean_most || echo "Failed cleanup" && exit 1
   rm -r -f $var_docker/
   rm -r -f /usr/libexec/docker/
   rm -r -f /var/lib/snapd/cache/*
@@ -177,8 +177,8 @@ clean_all() {
 unmount() {
   quiet snap disable docker && sleep 1
   if [[ -d $docker_data ]]; then
-    lsofd=$(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2)
-    if [[ "$lsofd" -ge 0 ]]; then
+    lsofd=$(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2 || true)
+    if [[ "$lsofd" -gt 0 ]]; then
       quiet kill $lsofd && rm -r -f $docker_data/* && sync
     fi
   fi
@@ -264,6 +264,7 @@ fi
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled
   rootless_path=$home/rootless
+  debug_cat="systemd-cat -t USR_RNLVL -p debug"
 else
   declare -- PUSH='"--push"'
 fi
@@ -280,7 +281,7 @@ pushd $docker_data > /dev/null
 popd > /dev/null
 
 echo 'Running as user: '$run_as' - user_id:group_id '$run_id:$run_id
-systemd-cat -t USR_RNLVL -p debug machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
+$debug_cat machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $PWD
 
@@ -489,7 +490,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
   chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub && \
   chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub || exit 1
-  echo "Starting SSH config." && ssh_config && ssh -T git@github.com 2>> $nulled
+  ssh_config && ssh -T git@github.com 2>> $nulled
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE && \
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE && \
   echo && ssh-add -l && echo || exit 1
@@ -722,7 +723,7 @@ if [ "$MOUNT" != "" ]; then
     unmount
 fi
 
-clean_all
+clean_all || echo "Failed cleanup" && exit 1
 quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime
 quiet systemctl unmask snap.docker.dockerd --runtime
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
@@ -730,8 +731,8 @@ quiet networkctl delete docker0
 systemd_ctl_common
 
 if [[ -d $home/$snap_path ]]; then
-  lsofd2=$(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2)
-  if [[ "$lsofd2" -ge 0 ]]; then
+  lsofd2=$(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2 || true)
+  if [[ "$lsofd2" -gt 0 ]]; then
     quiet kill $lsofd2 && rm -r -f $home/$snap_path/* && sync
   fi
 fi
@@ -741,7 +742,7 @@ snap remove grype --purge
 snap remove docker --purge 2>> $nulled && wait
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 
-clean_all
+clean_all || echo "Failed cleanup" && exit 1
 
 if [ "$TEST" = "yes" ]; then
   chown $run_as:$run_as $nulled
