@@ -1,8 +1,10 @@
-version: 7.68.0
+version: 8.2.1
 files:
-  - url: signal-desktop_7.68.0_arm64.deb
-    sha512: fVacl4fF2lz30RHuVo6hTPNaZ2qpdm7cMsYFwXdHD/T5G2/f0PHuERA/g6cR9mdWpyH19ccMmDF+Mc7H9hdcew==
-    size: 118745364
-path: signal-desktop_7.68.0_arm64.deb
-sha512: fVacl4fF2lz30RHuVo6hTPNaZ2qpdm7cMsYFwXdHD/T5G2/f0PHuERA/g6cR9mdWpyH19ccMmDF+Mc7H9hdcew==
-releaseDate: '2025-08-31T02:38:05.759Z'
+  - url: signal-desktop_8.2.1_arm64.deb
+    sha512: /sp4Zpz28r7Y1ACSjD5WdkCVKLEScbk1RN8DoicOJVOPtVX1JiGtag6niq21VA/wp551sYxkWj6aFQvnrJaGAw==
+    size: 118511664
+path: signal-desktop_8.2.1_arm64.deb
+sha512: /sp4Zpz28r7Y1ACSjD5WdkCVKLEScbk1RN8DoicOJVOPtVX1JiGtag6niq21VA/wp551sYxkWj6aFQvnrJaGAw==
+vendor:
+  minGlibcVersion: '2.34'
+releaseDate: '2026-03-17T00:13:20.528Z'

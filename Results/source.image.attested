@@ -1,0 +1,8 @@
+
+Verification for docker.io/0mniteck/debian-slim:02-18-2026 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+Certificate subject: tiger-varsity-alto@duck.com
+Certificate issuer URL: https://github.com/login/oauth

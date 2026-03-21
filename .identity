@@ -6,6 +6,9 @@ declare -- IDENTITY_FILE=.ssh/$MODULE
 declare -- PKI_ID_FILE=.ssh/.pki
 declare -- PROJECT=Signal-Desktop-Reproducible
 declare -- SIGSTORE_USR=tiger-varsity-alto@duck.com
+declare -- CLIENT_ID=Iv23liF4fUl7FZ7MmEay
+declare -- CLIENT_KEY=04e0db1302073df52fad18abae4fc4ca1466edec
+declare -- DEVICEFLOW_AUTH=$CLIENT_ID:$CLIENT_KEY
 declare -- USER_ID=10482171+0mniteck@users.noreply.github.com
 declare -- SIGNING_KEY=42E2DDF1E31B370F8BFFEE03287EE837E6ED2DD3
 git config --global user.email $USER_ID

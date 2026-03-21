@@ -1,0 +1,6 @@
+### signal-desktop:arm64 Syft Scan Results - syft 1.42.2
+ Cataloged contents 643c756cae98020838e1fbfc64de3715f360cf2842337e859b5a5d9d07ef3c37 
+  Packages [878 packages] 
+  Executables [1,371 executables] 
+  File metadata [17,376 locations] 
+  File digests [17,376 files] 

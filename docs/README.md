@@ -1,27 +1,27 @@
 [![image](https://github.com/user-attachments/assets/202613c2-97b8-4b54-b72c-6f8e110f0ff4)](https://signal.org)
 
 # Signal Desktop Builder For Debian:trixie-arm64
-### [signal-desktop_7.68.0_arm64.deb](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/builds/release/signal-desktop_7.68.0_arm64.deb)
+### [signal-desktop_8.2.0_arm64.deb](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/builds/release/signal-desktop_8.2.0_arm64.deb)
 
-This project reproducibly builds Signal Desktop for Debian:trixie-arm64, currently targeting tag `7.68.x`
+This project reproducibly builds Signal Desktop for Debian:trixie-arm64, currently targeting tag `8.2.x`
 
 > Now with an optional update client: [`auto-update-cron.sh`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/master/auto-update-cron.sh)
 
-This is the latest release: [`builds/release/signal-desktop_7.68.0_arm64.deb`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/builds/release/signal-desktop_7.68.0_arm64.deb)
+This is the latest release: [`builds/release/signal-desktop_8.2.0_arm64.deb`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/builds/release/signal-desktop_8.2.0_arm64.deb)
 
-Sha512Sum: [`Results/release.sha512sum`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/release.sha512sum)
+Sha512Sum: [`Results/release.sha512sum`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/release.sha512sum)
 
 > ### Full chain/("Full Scope") SBOMs and Attestations
 >
 > Firmware SBOM's: [`U-Boot:/Results`](https://github.com/0mniteck/U-Boot/tree/v2025.04%2Bv2.12.1%2Bv4.5.0/Results)
 >
-> System SBOM: [`Results/ubuntu.spdx.json`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/ubuntu.spdx.json)
+> System SBOM: [`Results/ubuntu.spdx.json`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/ubuntu.spdx.json)
 >
-> - [x] Grype Scan: [`Results/ubuntu.grype.status`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/ubuntu.grype.status)(https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/708b3a5e538546e7c23cd26c5fa3d1260ce7d42d/Results/ubuntu.grype.status#L1-L3)
+> - [x] Grype Scan: [`Results/ubuntu.grype.status`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/ubuntu.grype.status)(https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/708b3a5e538546e7c23cd26c5fa3d1260ce7d42d/Results/ubuntu.grype.status#L1-L3)
 >
-> Docker SBOM: [`Results/signal.spdx.json`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/signal.spdx.json)
+> Docker SBOM: [`Results/signal.spdx.json`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/signal.spdx.json)
 >
-> - [x] Grype Scan: [`Results/signal.grype.status`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/signal.grype.status)(https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/71cac5a24f2abf71af5fdefb0b08cea8a391b91d/Results/signal.grype.status#L1-L3)
+> - [x] Grype Scan: [`Results/signal.grype.status`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/signal.grype.status)(https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/71cac5a24f2abf71af5fdefb0b08cea8a391b91d/Results/signal.grype.status#L1-L3)
 
 0mniteck's Current GPG Key ID: `287EE837E6ED2DD3`
 
@@ -32,13 +32,13 @@ Sha512Sum: [`Results/release.sha512sum`](https://github.com/0mniteck/Signal-Desk
 ### Usage:
 
 > Installation:
-> 1. [Download the `.deb`](https://github.com/0mniteck/Signal-Desktop-Reproducible/raw/7.68.x/builds/release/signal-desktop_7.68.0_arm64.deb) to your device
+> 1. [Download the `.deb`](https://github.com/0mniteck/Signal-Desktop-Reproducible/raw/8.2.x/builds/release/signal-desktop_8.2.0_arm64.deb) to your device
 > 2. verify the sha512sum
-> [[Current sha512sum]](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/7.68.x/Results/release.sha512sum#L2)
+> [[Current sha512sum]](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/release.sha512sum#L2)
 > (https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/708b3a5e538546e7c23cd26c5fa3d1260ce7d42d/Results/release.sha512sum#L2)
-> - ```sha512sum signal-desktop_7.68.0_arm64.deb```
+> - ```sha512sum signal-desktop_8.2.0_arm64.deb```
 > 3. install:
-> - ```pkexec apt install ./signal-desktop_7.68.0_arm64.deb```
+> - ```pkexec apt install ./signal-desktop_8.2.0_arm64.deb```
 
 ### Optional Installer/Updater:
 
@@ -86,7 +86,7 @@ cd Signal-Desktop-Reproducible && \
 ./buildscript.sh
 ```
 
-## Current Status:‎‎‏‏‎‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎[![CI](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml/badge.svg?branch=7.68.x)](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml)<sub><sup> signalapp/Signal-Desktop</sup></sub>
+## Current Status:‎‎‏‏‎‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎[![CI](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml/badge.svg?branch=8.2.x)](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml)<sub><sup> signalapp/Signal-Desktop</sup></sub>
 
 # WIP
 * [x] Built with [0mniteck/debian-slim:02-18-2026](https://hub.docker.com/r/0mniteck)
