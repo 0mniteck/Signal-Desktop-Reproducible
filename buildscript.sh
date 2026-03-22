@@ -264,7 +264,8 @@ fi
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled
   rootless_path=$home/rootless
-  debug_cat="systemd-cat -t USR_RNLVL -p debug"
+  debug_cat="journalctl -t USR_RNLVL -f &
+  systemd-cat -t USR_RNLVL -p debug"
 else
   declare -- PUSH='"--push"'
 fi
