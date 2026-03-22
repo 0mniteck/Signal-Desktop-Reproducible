@@ -18,7 +18,7 @@ Options:
 _EOF
 }
 
-GETOPT=$(which getopt || exit 1) 
+GETOPT=$(which getopt || exit 1)
 PRESERVED=$(echo "$@")
 LONG="\
 runme:,\
@@ -264,7 +264,7 @@ fi
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled
   rootless_path=$home/rootless
-  debug_cat="journalctl -t USR_RNLVL -f &
+  debug_cat="journalctl -t USR_RNLVL -f -- & 
   systemd-cat -t USR_RNLVL -p debug"
 else
   declare -- PUSH='"--push"'
