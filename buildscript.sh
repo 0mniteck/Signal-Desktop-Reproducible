@@ -264,8 +264,8 @@ fi
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled
   rootless_path=$home/rootless
-  debug_cat="journalctl -t USR_RNLVL -f -- & 
-  systemd-cat -t USR_RNLVL -p debug"
+  debug_cat="journalctl -t USR_RNLVL -f"
+  systemd_cat="systemd-cat -t USR_RNLVL -p debug"
 else
   declare -- PUSH='"--push"'
 fi
@@ -282,7 +282,8 @@ pushd $docker_data > /dev/null
 popd > /dev/null
 
 echo 'Running as user: '$run_as' - user_id:group_id '$run_id:$run_id
-$debug_cat machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
+$debug_cat &
+$systemd_cat machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
 $debug
 cd $PWD
 
@@ -491,7 +492,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
   chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub && \
   chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub || exit 1
-  ssh_config && ssh -T git@github.com 2>> $nulled
+  ssh_config && ssh -T git@github.com 2>> $nulled || true
   ssh-add -t 1D -h git@github.com $home/\$IDENTITY_FILE && \
   ssh-add -t 1D -h git@github.com $home/\$PKI_ID_FILE && \
   echo && ssh-add -l && echo || exit 1
