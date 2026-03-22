@@ -177,7 +177,7 @@ clean_all() {
 unmount() {
   quiet snap disable docker && sleep 1
   if [[ -d $docker_data ]]; then
-    lsofd=$($(lsof -F p $docker_data 2>> $nulled || true) | cut -d'p' -f2)
+    lsofd=$(echo $(lsof -F p $docker_data 2>> $nulled || true) | cut -d'p' -f2)
     if [[ "$lsofd" -gt 0 ]]; then
       quiet kill $lsofd && rm -r -f $docker_data/* && sync
     fi
@@ -733,7 +733,7 @@ quiet networkctl delete docker0
 systemd_ctl_common
 
 if [[ -d $home/$snap_path ]]; then
-  lsofd2=$($(lsof -F p $home/$snap_path 2>> $nulled || true) | cut -d'p' -f2)
+  lsofd2=$(echo $(lsof -F p $home/$snap_path 2>> $nulled || true) | cut -d'p' -f2)
   if [[ "$lsofd2" -gt 0 ]]; then
     quiet kill $lsofd2 && rm -r -f $home/$snap_path/* && sync
   fi
