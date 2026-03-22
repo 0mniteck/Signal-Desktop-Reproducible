@@ -56,7 +56,7 @@ if [[ "$TEST" == "" ]]; then
   nulled=/dev/null
 else
   TEST="yes"
-  SKIP_LOGIN="yes"
+  # SKIP_LOGIN="yes"
   debug="set -vx"
   nulled=/tmp/nulled.log
 fi
