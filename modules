@@ -37,7 +37,7 @@ $POPD
 
 docker buildx create \
   --name $MODULE-builder $CROSS --buildkitd-flags "--oci-worker-rootless=true" \
-  --driver docker-container --driver-opt "network=host,default-load=true" --bootstrap --use
+  --driver docker-container --driver-opt "network=host,default-load=true" --bootstrap --use || return 78
 
 if [[ "$last_rel_date" != "$rel_date" ]]; then
   sed -i s/last_epoch=$last_epoch/last_epoch=$source_date_epoch/g .pinned_ver
@@ -47,49 +47,49 @@ if [[ "$last_rel_date" != "$rel_date" ]]; then
     --output "type=image,name=docker.io/$TRIPL,push=true,rewrite-timestamp=true" \
     --iidfile $RESULTS/$MODULE.image.id --push --tag $TRIPL \
     --metadata-file $RESULTS/$MODULE.meta.json \
-    --label org.opencontainers.image.title=$TRIPL \
-    --label org.opencontainers.image.vendor=$REPO \
-    --label org.opencontainers.image.licenses=GPL-3.0 \
-    --label org.opencontainers.image.version=$rel_date \
-    --label org.opencontainers.image.base.name=$source_loc \
-    --label org.opencontainers.image.description="$(sed -n 2p $0)" \
-    --build-arg SOURCE_DATE_EPOCH=$source_date_epoch \
+    --label $OCI.title=$TRIPL \
+    --label $OCI.vendor=$REPO \
+    --label $OCI.licenses=GPL-3.0 \
+    --label $OCI.version=$rel_date \
+    --label $OCI.base.name=$source_loc \
+    --label $OCI.description=$no_ai \
+    --build-arg SOURCE_DATE_EPOCH=$sde \
     --build-arg NODE_VERSION=$node_ver \
     --build-arg PNPM_VERSION=$pnpm_ver \
     --build-arg NVM_VERSION=$nvm_ver \
     --build-arg BRANCH=$ver_num \
     --build-arg SOURCE=$source \
-    --build-arg COMMIT=$commit .
+    --build-arg COMMIT=$commit . || return 78
   docker buildx stop $MODULE-builder && wait
   docker buildx rm -f --all-inactive && wait
   docker buildx prune -f -a && wait && echo
   $PUSHD_RES
-    attest_multi-arch $MODULE $TRIPL $CROSS
+    attest_multi-arch $MODULE $TRIPL $CROSS || return 78
 else
   $PUSHD_RES
 fi
     for A in arm64 amd64; do
-      scan_using_grype $MODULE $TRIPL $A
+      scan_using_grype $MODULE $TRIPL $A || return 78
     done && unset A
   $POPD
 
 docker run -it --cpus=$(nproc) \
   --network=name=host,\"driver-opt=network=host\" \
   --platform linux/arm64 --cgroupns private \
-  --name $MODULE -e SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
-  $(cat $RESULTS/arm64/$MODULE.manifest.ref) $TEST $SIGNING_KEY || return 78
+  --name $MODULE -e SOURCE_DATE_EPOCH=$SDE \
+  $(cat $RESULTS/arm64/$MODULE.manifest.ref) \
+  $TEST $SIGNING_KEY || return 78
 
 rm -r -f {builds/,}release && mkdir -p release || return 78
 docker cp $MODULE:/$NAME/release/ . && \
 mv release/release.sha*sum $RESULTS/ || return 78
 
 $PUSHD_RES
-  if [ "$check_file" = "1" ]; then
-    cp /tmp/release.last.sha512sum release.last.sha512sum
-    sha512sum -c release.last.sha512sum && REP="ly Reproduced" && \
-    rm -f /tmp/release.last.sha512sum && rm -f release.last.sha512sum || return 78
+  if [[ "$check_file" == "1" ]]; then
+    cp /tmp/release.last.sha512sum release.last.sha512sum && \
+    sha512sum -c release.last.sha512sum && REP="ly Reproduced" || return 78
   fi
-  echo "Successful$REP Build"
-  echo "# Base Build System: $(uname -o) $(uname -r) $(uname -m) $(lsb_release -ds) $(lsb_release -cs) $(uname -v)" >> release.sha512sum
-  awk '{a[i++]=$0}END{for(j=0;j<i-2;j++)print a[j];print a[i-1];print a[i-2]}' $RESULTS/release.sha512sum > tmp && mv tmp release.sha512sum
-$POPD && ls -la release && ls -la $RESULTS && return 0
+  rm -f {/tmp/,}release.last.sha512sum && echo "Successful$REP Build!"
+  echo "# Base Build System: $(uname -o) $(uname -r) $(uname -m) $(lsb_release -ds) $(lsb_release -cs) $(uname -v)" >> release.sha512sum && \
+  awk '{a[i++]=$0}END{for(j=0;j<i-2;j++)print a[j];print a[i-1];print a[i-2]}' $RESULTS/release.sha512sum > tmp && mv tmp release.sha512sum || return 78
+$POPD && ls -la release/ $RESULTS/ && return 0
