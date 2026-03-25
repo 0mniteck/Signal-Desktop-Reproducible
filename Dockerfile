@@ -13,7 +13,7 @@ https://github.com/node-ffi-napi/node-ffi-napi/raw/master/deps/libffi/config/lin
 ADD --checksum=sha256:4b7412c49960c7d31e8df72da90c1fb5b8cccb419ac99537b737028d497aba4f \
 https://github.com/nvm-sh/nvm/raw/v$NVM_VERSION/install.sh /
 
-ADD --keep-git-dir=true https://github.com/signalapp/Signal-Desktop.git?branch=$BRANCH.x&checksum=$COMMIT /Signal-Desktop
+ADD --checksum=$COMMIT --keep-git-dir=true https://github.com/signalapp/Signal-Desktop.git?branch=$BRANCH.x&checksum=$COMMIT /Signal-Desktop
 
 RUN mkdir -p /Signal-Desktop/artifacts/linux/logs $NVM_DIR && gem install fpm && \
     chmod +x install.sh && ./install.sh && . $NVM_DIR/nvm.sh && rm -f /install.sh && \
