@@ -1,42 +1,39 @@
-
+#!/bin/false
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
 
-ver_split() {
-  if [[ "$INC" != "" ]]; then
-    ver_split=$(echo "$last_ver_num + $INC" | bc -l)
-  else
-    ver_split=$(echo "$last_ver_num + .00" | bc -l)
-  fi
-  ver_maj=$(echo $ver_split | cut -d'.' -f1)
-  ver_min=$(echo $ver_split | cut -d'.' -f2)
-  if [[ "$ver_min" == *00* ]]; then
-    ver_min=0
-  elif [[ "$ver_min" == *0* ]]; then
-    ver_min=$(echo $ver_min | cut -d'0' -f2)
-  fi
-  ver_num=$ver_maj.$ver_min
-  if [[ "$INC" != "" ]]; then
-    sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g docs/_layouts/default.html
-    sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g docs/README.md
-    sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g readme.md
-    sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g Dockerfile
-    sed -i s/last_ver_num=$last_ver_num/last_ver_num=$ver_split/g .pinned_ver
-    echo -e "Version Incremented: From v$last_ver_num To v$ver_split\nTarget Branch: $ver_num.x\n"
-  else
-    echo -e "Version: v$ver_split\nTarget Branch: $ver_num.x\n"
-  fi
-}
+if [[ "$INC" != "" ]]; then
+  ver_split=$(echo "$last_ver_num + $INC" | bc -l)
+else
+  ver_split=$(echo "$last_ver_num + .00" | bc -l)
+fi
+ver_maj=$(echo $ver_split | cut -d'.' -f1)
+ver_min=$(echo $ver_split | cut -d'.' -f2)
+if [[ "$ver_min" == *00* ]]; then
+  ver_min=0
+elif [[ "$ver_min" == *0* ]]; then
+  ver_min=$(echo $ver_min | cut -d'0' -f2)
+fi
+ver_num=$ver_maj.$ver_min
+if [[ "$INC" != "" ]]; then
+  sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g docs/_layouts/default.html
+  sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g docs/README.md
+  sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g readme.md
+  sed -i s/$(echo $last_ver_num)/$(echo $ver_num)/g Dockerfile
+  sed -i s/last_ver_num=$last_ver_num/last_ver_num=$ver_split/g .pinned_ver
+  echo -e "Version Incremented: From v$last_ver_num To v$ver_split\nTarget Branch: $ver_num.x\n"
+else
+  echo -e "Version: v$ver_split\nTarget Branch: $ver_num.x\n"
+fi
 
-ver_split
-
-pushd $RESULTS > /dev/null
-  echo 'Starting cosign...' && pushd source > /dev/null
+$PUSHD_RES
+  echo 'Starting cosign...' && pushd source >> /dev/null
   cosign_run_src="script -q -c 'cosign verify-attestation $source_loc \
-    --certificate-oidc-issuer https://github.com/login/oauth --certificate-identity $SIGSTORE_USR \
-    --type spdxjson > source.sig.bundle' /dev/null > source.attested"
-  quiet $cosign_run_src || quiet $cosign_run_src || exit 1
-  cat source.attested && echo && popd > /dev/null
-popd > /dev/null
+    --certificate-oidc-issuer https://github.com/login/oauth \
+    --certificate-identity $SIGSTORE_USR --type spdxjson \
+    > source.sig.bundle' /dev/null > source.attested"
+  quiet $cosign_run_src || quiet $cosign_run_src || return 78
+  cat source.attested && echo && $POPD
+$POPD
 
 docker buildx create \
   --name $MODULE-builder $CROSS --buildkitd-flags "--oci-worker-rootless=true" \
@@ -48,11 +45,14 @@ if [[ "$last_rel_date" != "$rel_date" ]]; then
   docker buildx build $CROSS \
     --attest "type=provenance,mode=max,builder-id=local-build,reproducible=true" \
     --output "type=image,name=docker.io/$TRIPL,push=true,rewrite-timestamp=true" \
+    --iidfile $RESULTS/$MODULE.image.id --push --tag $TRIPL \
     --metadata-file $RESULTS/$MODULE.meta.json \
-    --iidfile $RESULTS/$MODULE.image.id \
-    --push --tag $TRIPL \
-    --label org.opencontainers.image.licenses=GPL-3.0 \
+    --label org.opencontainers.image.title=$TRIPL \
     --label org.opencontainers.image.vendor=$REPO \
+    --label org.opencontainers.image.licenses=GPL-3.0 \
+    --label org.opencontainers.image.version=$rel_date \
+    --label org.opencontainers.image.base.name=$source_loc \
+    --label org.opencontainers.image.description="$(sed -n 2p $0)" \
     --build-arg SOURCE_DATE_EPOCH=$source_date_epoch \
     --build-arg NODE_VERSION=$node_ver \
     --build-arg PNPM_VERSION=$pnpm_ver \
@@ -63,33 +63,33 @@ if [[ "$last_rel_date" != "$rel_date" ]]; then
   docker buildx stop $MODULE-builder && wait
   docker buildx rm -f --all-inactive && wait
   docker buildx prune -f -a && wait && echo
-  pushd $RESULTS > /dev/null
+  $PUSHD_RES
     attest_multi-arch $MODULE $TRIPL $CROSS
 else
-  pushd $RESULTS > /dev/null
+  $PUSHD_RES
 fi
     for A in arm64 amd64; do
       scan_using_grype $MODULE $TRIPL $A
     done && unset A
-  popd > /dev/null
+  $POPD
 
 docker run -it --cpus=$(nproc) \
   --network=name=host,\"driver-opt=network=host\" \
-  --name $MODULE --platform linux/arm64 --cgroupns private \
-  -e SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH $TRIPL $TEST $SIGNING_KEY
+  --platform linux/arm64 --cgroupns private \
+  --name $MODULE -e SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
+  $(cat $RESULTS/arm64/$MODULE.manifest.ref) $TEST $SIGNING_KEY || return 78
 
-rm -r -f builds/release && mkdir -p builds/release
-docker cp $MODULE:/$NAME/release/ builds/ && rm -r -f builds/release/linux-*
-mv builds/release/*.sha*sum $RESULTS/
+rm -r -f {builds/,}release && mkdir -p release || return 78
+docker cp $MODULE:/$NAME/release/ . && \
+mv release/release.sha*sum $RESULTS/ || return 78
 
-pushd $RESULTS > /dev/null
+$PUSHD_RES
   if [ "$check_file" = "1" ]; then
     cp /tmp/release.last.sha512sum release.last.sha512sum
     sha512sum -c release.last.sha512sum && REP="ly Reproduced" && \
-    rm -f /tmp/release.last.sha512sum && rm -f release.last.sha512sum || exit 1
+    rm -f /tmp/release.last.sha512sum && rm -f release.last.sha512sum || return 78
   fi
   echo "Successful$REP Build"
   echo "# Base Build System: $(uname -o) $(uname -r) $(uname -m) $(lsb_release -ds) $(lsb_release -cs) $(uname -v)" >> release.sha512sum
   awk '{a[i++]=$0}END{for(j=0;j<i-2;j++)print a[j];print a[i-1];print a[i-2]}' $RESULTS/release.sha512sum > tmp && mv tmp release.sha512sum
-popd > /dev/null
-ls -la builds/release/ && ls -la $RESULTS
+$POPD && ls -la release && ls -la $RESULTS && return 0
