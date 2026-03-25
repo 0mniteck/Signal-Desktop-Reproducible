@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
-ARG BUILDKIT_SBOM_SCAN_CONTEXT=true BUILDKIT_SBOM_SCAN_STAGE=signal-desktop SOURCE=0mniteck/debian-slim
+ARG BUILDKIT_SBOM_SCAN_CONTEXT=true BUILDKIT_SBOM_SCAN_STAGE=signal-desktop SOURCE=0mniteck/debian-slim@unknown-tag
 
 FROM $SOURCE AS signal-desktop
 ARG NODE_VERSION NVM_VERSION PNPM_VERSION BRANCH COMMIT SOURCE_DATE_EPOCH
