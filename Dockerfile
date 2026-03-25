@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
-ARG BUILDKIT_SBOM_SCAN_CONTEXT=true BUILDKIT_SBOM_SCAN_STAGE=base,squasher SOURCE=0mniteck/debian-slim
+ARG BUILDKIT_SBOM_SCAN_CONTEXT=true BUILDKIT_SBOM_SCAN_STAGE=base SOURCE=0mniteck/debian-slim
 FROM $SOURCE AS base
 ARG NODE_VERSION NVM_VERSION PNPM_VERSION BRANCH COMMIT SOURCE_DATE_EPOCH
 ENV CI=true SIGNAL_ENV=production USE_SYSTEM_FPM=true NVM_DIR=/usr/local/nvm PNPM_HOME=/tmp/.pnpm-home NPM_CONFIG_CACHE=/tmp/.npm-cache
@@ -12,10 +12,5 @@ ADD --checksum=sha256:4b7412c49960c7d31e8df72da90c1fb5b8cccb419ac99537b737028d49
 ADD --keep-git-dir=true https://github.com/signalapp/Signal-Desktop.git?branch=$BRANCH.x&checksum=$COMMIT /Signal-Desktop
 RUN mkdir -p /Signal-Desktop/artifacts/linux/logs $NVM_DIR && gem install fpm && chmod +x install.sh && ./install.sh && . $NVM_DIR/nvm.sh && nvm install $NODE_VERSION && nvm alias $NODE_VERSION && nvm use $NODE_VERSION
 RUN mv fficonfig.h /usr/include/aarch64-linux-gnu/fficonfig.h && git config --global --add safe.directory /project && npm install --location=global pnpm@$PNPM_VERSION
-FROM scratch AS squasher
-COPY --from=base / /
-ARG NODE_VERSION SOURCE_DATE_EPOCH
-ENV CI=true SIGNAL_ENV=production USE_SYSTEM_FPM=true NVM_DIR=/usr/local/nvm PNPM_HOME=/tmp/.pnpm-home NPM_CONFIG_CACHE=/tmp/.npm-cache
-ENV NODE_PATH=$NVM_DIR/v$NODE_VERSION/lib/node_modules PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
 ENTRYPOINT ["signal-buildscript.sh"]
 CMD ["no",""]
