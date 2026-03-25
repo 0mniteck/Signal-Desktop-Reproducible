@@ -2,6 +2,7 @@
 # Strict requirement for docker public registries: https, and @digest_tag or --checksum
 # docker buildx build --policy reset=true,strict=true,filename=$REPO.rego .
 # docker buildx build --policy log-level=debug .
+# docker buildx policy eval --print --fields image.labels docker-image://$source_img
 # docker buildx policy eval --print $source
 package docker
 
