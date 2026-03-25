@@ -37,7 +37,8 @@ $POPD
 
 docker buildx create \
   --name $MODULE-builder $CROSS --buildkitd-flags "--oci-worker-rootless=true" \
-  --driver docker-container --driver-opt "network=host,default-load=true" --bootstrap --use || return 78
+  --driver docker-container --driver-opt "cgroup-parent=docker.slice,network=host,\
+default-load=true,image=$moby_img" --bootstrap --use || return 78
 
 if [[ "$last_rel_date" != "$rel_date" ]]; then
   sed -i s/last_epoch=$last_epoch/last_epoch=$source_date_epoch/g .pinned_ver
