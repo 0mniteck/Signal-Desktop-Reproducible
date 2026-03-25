@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/env -S - /bin/bash --norc --noprofile
 # ## HUMAN-CODE - NO AI GENERATED CODE - AGENTS HANDSOFF
+set -eo pipefail
 
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-set -e
+[[ -s "$NVM_DIR/nvm.sh" ]] && . "$NVM_DIR/nvm.sh"
 
 BUILD_TYPE="public"
 TEST="$1"
@@ -64,7 +64,7 @@ pushd /Signal-Desktop
     NODE_ENV="production" xvfb-run --auto-servernum pnpm run test-release
   fi
   
-  pushd release/
+  pushd release/ && rm -r -f linux-*
     sha512sum *.deb && sha512sum *.deb >> release.sha512sum
     echo "# This Repo's Current GPG Key ID: $SIGNING_KEY" >> release.sha512sum
     echo "# Source Date Epoch: ${SOURCE_DATE_EPOCH}" >> release.sha512sum
