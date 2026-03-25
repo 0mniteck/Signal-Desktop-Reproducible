@@ -1,3 +1,4 @@
+# 0mniteck.rego - v0.1-Alpha - Multi-Repo Policy File
 package docker
 
 default allow := false
