@@ -6,6 +6,7 @@
 # docker buildx build --progress=plain --policy log-level=debug,reset=true,strict=true,filename=$REPO.rego .
 # docker buildx policy eval --print --fields image.checksum docker-image://$source_img
 # docker buildx policy eval --print $source
+# Builtins: print load_json verify_git_signature pin_image
 #
 package docker
 
@@ -81,7 +82,6 @@ allow if {
 #DEMO3
 
 # TODO: Add your pinned images with exact digests
-
 # Docker Hub images use docker.io as host
 allowed_dockerhub := {
   "alpine": "sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412",
