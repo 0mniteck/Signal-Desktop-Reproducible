@@ -1,9 +1,12 @@
 # 0mniteck.rego - v0.1.1-Alpha - Multi-Repo Policy File
 # Strict requirement for docker public registries: https, and @digest_tag or --checksum
+#
+#  Demos:
 # docker buildx build --policy reset=true,strict=true,filename=$REPO.rego .
 # docker buildx build --progress=plain --policy log-level=debug,reset=true,strict=true,filename=$REPO.rego .
-# docker buildx policy eval --print --fields image.labels docker-image://$source_img
+# docker buildx policy eval --print --fields image.checksum docker-image://$source_img
 # docker buildx policy eval --print $source
+#
 package docker
 
 default allow := false
@@ -12,6 +15,7 @@ allow if input.local
 
 allow if {
   input.image.host == "docker.io"  # Docker Hub
+  input.image.checksum == digest
 }
 
 allow if {
@@ -77,6 +81,7 @@ allow if {
 #DEMO3
 
 # TODO: Add your pinned images with exact digests
+
 # Docker Hub images use docker.io as host
 allowed_dockerhub := {
   "alpine": "sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412",
