@@ -1,7 +1,8 @@
 # 0mniteck.rego - v0.1.1-Alpha - Multi-Repo Policy File
 # Strict requirement for docker public registries: https, and @digest_tag or --checksum
 # docker buildx build --policy reset=true,strict=true,filename=$REPO.rego .
-# docker buildx build --print --policy .
+# docker buildx build --policy log-level=debug .
+# docker buildx policy eval --print $source
 package docker
 
 default allow := false
