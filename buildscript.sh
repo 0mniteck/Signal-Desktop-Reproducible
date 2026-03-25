@@ -724,10 +724,10 @@ $POPD
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git status && git add -A && git status && confirm 'git commit - git@ssh'
-  if [ \"\$BRANCH\" != \"\" ]; then
+  if [[ \"\$BRANCH\" != \"\" ]]; then
     git commit -a -S -m \"Successful Build of Release \$date_rel\" && \
     git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
-    if [ \"\$TAG\" != \"\" ]; then
+    if [[ \"\$TAG\" != \"\" ]]; then
       git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && \
       git push origin \"refs/tags/\$TAG\"
     fi
@@ -766,7 +766,7 @@ snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 
 clean_all || echo "Failed cleanup"
 
-if [[ "$TEST" = "yes" ]]; then
+if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $PUSHD_LOG
 fi
 exit 0
