@@ -26,7 +26,7 @@ else
 fi
 
 $PUSHD_RES
-  echo 'Starting cosign...' && pushd source >> /dev/null
+  echo 'Starting cosign...' && pushd source >> $PUSHD_LOG
   cosign_run_src="script -q -c 'cosign verify-attestation $source_loc \
     --certificate-oidc-issuer https://github.com/login/oauth \
     --certificate-identity $SIGSTORE_USR --type spdxjson \
@@ -38,7 +38,7 @@ $POPD
 docker buildx create \
   --name $MODULE-builder $CROSS --buildkitd-flags "--oci-worker-rootless=true" \
   --driver docker-container --driver-opt "cgroup-parent=docker.slice,network=host,\
-default-load=true,image=$moby_img" --bootstrap --use || return 78
+default-load=true,image=$moby" --bootstrap --use || return 78
 
 if [[ "$last_rel_date" != "$rel_date" ]]; then
   sed -i s/last_epoch=$last_epoch/last_epoch=$source_date_epoch/g .pinned_ver
