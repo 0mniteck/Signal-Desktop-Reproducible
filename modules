@@ -45,7 +45,7 @@ if [[ "$last_rel_date" != "$rel_date" ]]; then
   docker buildx build $CROSS \
     --attest "type=provenance,mode=max,builder-id=local-build,reproducible=true" \
     --output "type=image,name=docker.io/$TRIPL,push=true,rewrite-timestamp=true" \
-    --iidfile $RESULTS/$MODULE.image.id --push --tag $TRIPL \
+    --iidfile $RESULTS/$MODULE.image.id $PUSH --tag $TRIPL \
     --metadata-file $RESULTS/$MODULE.meta.json \
     --label $OCI.title=$TRIPL \
     --label $OCI.vendor=$REPO \
@@ -74,10 +74,10 @@ fi
   $POPD
 
 docker run -it --cpus=$(nproc) \
-  --network=name=host,\"driver-opt=network=host\" \
-  --platform linux/arm64 --cgroupns private \
+  --network=host,\"driver-opt=network=host\" \
+  --platform linux/$ANAME --cgroupns private \
   --name $MODULE -e SOURCE_DATE_EPOCH=$SDE \
-  $(cat $RESULTS/arm64/$MODULE.manifest.ref) \
+  $(cat $RESULTS/$ANAME/$MODULE.manifest.ref) \
   $TEST $SIGNING_KEY || return 78
 
 rm -r -f {builds/,}release && mkdir -p release || return 78
@@ -92,4 +92,4 @@ $PUSHD_RES
   rm -f {/tmp/,}release.last.sha512sum && echo "Successful$REP Build!"
   echo "# Base Build System: $(uname -o) $(uname -r) $(uname -m) $(lsb_release -ds) $(lsb_release -cs) $(uname -v)" >> release.sha512sum && \
   awk '{a[i++]=$0}END{for(j=0;j<i-2;j++)print a[j];print a[i-1];print a[i-2]}' $RESULTS/release.sha512sum > tmp && mv tmp release.sha512sum || return 78
-$POPD && ls -la release/ $RESULTS/ && return 0
+$POPD && ls -la release/ $RESULTS/ $RESULTS/* && return 0
