@@ -1,14 +1,13 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2//EN">
 <!-- saved from url=(0033)https://developercertificate.org/ -->
 <html><!--
-    File:   index.html
+    File:   Developer Certificate of Origin.md
     Editor: None, you wimpy wysiwyg people...this is hand crafted!
             What are you doing reading this anyway???
 --><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
 
 	<title>Developer Certificate of Origin</title>
-<style>:is([id*='google_ads_iframe'],[id*='taboola-'],.taboolaHeight,.taboola-placeholder,#top-ad,#credential_picker_container,#credentials-picker-container,#credential_picker_iframe,[id*='google-one-tap-iframe'],#google-one-tap-popup-container,.google-one-tap__module,.google-one-tap-modal-div,#amp_floatingAdDiv,#ez-content-blocker-container) {display:none!important;min-height:0!important;height:0!important;}</style></head>
-
+</head>
 <body>
 <pre>Developer Certificate of Origin
 Version 1.1
