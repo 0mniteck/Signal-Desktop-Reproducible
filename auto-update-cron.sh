@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Version 2.0
+# Version 2.1
 #
 # Script to add a cron job to check for, download, and install the most recent version from this git repo.
 # This will auto-close signal-desktop before installing, default is to check after 5 min on reboot and every 2 days.
 #
 # NOTE: This client is assuming you have DNSSEC on and validating querys on your local domain/device; or that
-# you are inherently trusting https://github.com and https://githubusercontent.com.
-#
+# you are inherently trusting https://github.com and thus https://githubusercontent.com.
+# #WIP: New feat. add gh attestation verifications #WIP
 # Author: Shant Tchatalbachian
 
-# Function to check for internet connectivity
+# Function to check for 1.1.1.1 internet connectivity
 check_internet() {
-    wget -q --spider https://google.com
+    wget -q --spider https://1.1.1.1/help
     return $?
 }
 
