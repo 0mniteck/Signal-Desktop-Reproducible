@@ -302,11 +302,15 @@ else
 fi
 
 pushd $docker_data >> $pushd_log
+  snap version > snap.info
+  snap debug execution snap >> snap.info
+  snap debug execution apparmor >> snap.info
+  snap debug sandbox-features >> snap.info
   save_id=0:0.env
   set > $save_id
   env | sort >> $save_id
   declare >> $save_id
-  chown $run_as:$run_as $save_id
+  chown $run_as:$run_as $save_id snap.info
 $popd
 
 echo 'Running as user: '$run_as' - user_id:group_id '$run_id:$run_id
@@ -591,6 +595,7 @@ export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
 source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
 echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
+rm -r -f Results* $results* && mkdir -p $results/{arm64,amd64,source,env} || exit 1
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
@@ -617,7 +622,7 @@ GRYPE_DB_CACHE_DIR=$docker_data/grype
 HOME=$home
 NO_COLOR=true
 PATH=$path:$docker_path:$home/docker/bin
-SOURCE_DATE_EPOCH=\$source_date_epoch
+SOURCE_DATE_EPOCH=\$sde
 SYFT_CACHE_DIR=$docker_data/syft
 TERM=$term
 XDG_CONFIG_HOME=$home
@@ -637,8 +642,7 @@ sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sys
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
-sys_ctl_common
-systemctl --user start docker.dockerd && sleep 10
+sys_ctl_common && systemctl --user start docker.dockerd && sleep 5
 systemctl --user status docker.slice --all --no-pager -l > $rootless_path/docker.slice.log
 systemctl --user status docker.dockerd --all --no-pager -l > $rootless_path/docker.dockerd.log
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
@@ -651,6 +655,23 @@ else
   echo -e \$rootless
   echo -e \$rootless > $rootless_path/tmp/rootless.status
 fi
+
+$pushd_results && pushd env >> $pushd_log
+  save_id=$run_id:$run_id.env
+  set > \$save_id
+  env | sort >> \$save_id
+  declare >> \$save_id
+  mv $docker_data/{0:0.env,snap.info} .
+  cp $rootless_path/env-docker docker.env
+  echo -e '\nDocker Version:\n' >> docker.info
+  quiet '$docker version > docker.info'
+  echo -e '\nDocker Info:\n' >> docker.info
+  quiet '$docker info >> docker.info'
+  echo -e '\nBuildx Version:\n' >> docker.info
+  quiet '$docker buildx version >> docker.info'
+  echo -e '\nBuildx Inspect:\n' >> docker.info
+  quiet '$docker buildx inspect --bootstrap >> docker.info'
+$popd && $popd
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
@@ -699,26 +720,6 @@ else
   sub_ver=1
   subver \$sub_ver
 fi
-
-rm -r -f Results* $results* && mkdir -p $results/{arm64,amd64,source,env}
-$pushd_results
-  pushd env >> $pushd_log
-    save_id=$run_id:$run_id.env
-    set > \$save_id
-    env | sort >> \$save_id
-    declare >> \$save_id
-    mv $docker_data/0:0.env 0:0.env
-    cp $rootless_path/env-docker docker.env
-    echo -e '\nDocker Version:\n' >> docker.info
-    quiet '$docker version > docker.info'
-    echo -e '\nDocker Info:\n' >> docker.info
-    quiet '$docker info >> docker.info'
-    echo -e '\nBuildx Version:\n' >> docker.info
-    quiet '$docker buildx version >> docker.info'
-    echo -e '\nBuildx Inspect:\n' >> docker.info
-    quiet '$docker buildx inspect --bootstrap >> docker.info'
-  $popd
-$popd
 
 if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   source modules || drop_down || exit \$PIPESTATUS
@@ -781,5 +782,4 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
-
 exit 0
