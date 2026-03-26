@@ -94,8 +94,7 @@ repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
 module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
 arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
 amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
-export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin \
-TRIPL=$repo/$module:$rel_date
+export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin TRIPL=$repo/$module:$rel_date
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
@@ -323,7 +322,7 @@ export -- \
 ANAME=$ANAME BRANCH=$BRANCH CROSS=$CROSS DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
 EPOCH=$EPOCH GPG_TTY=\$(/bin/tty) HOME=$HOME INC=$INC MOUNT=$MOUNT NO_AI=$NO_AI OCI=$OCI PATH=$PATH \
 POPD=$popd PUSH=$PUSH PUSHD_LOG=$pushd_log PUSHD_RESULTS=$pushd_results RESULTS=$RESULTS SKIP_LOGIN=$SKIP_LOGIN \
-SSH_CONF=\$(<$HOME/.ssh/config) TAG=$TAG TERM=$TERM TEST=$TEST XDG_RUNTIME_DIR=$RUN_DIR \
+SSH_CONF=\$(<$HOME/.ssh/config) TAG=$TAG TERM=$TERM TEST=$TEST TRIPL=$TRIPL XDG_RUNTIME_DIR=$RUN_DIR \
 || exit 1
 
 eval \"\$(ssh-agent -s)\" >> $nulled && wait
@@ -782,4 +781,5 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
+
 exit 0
