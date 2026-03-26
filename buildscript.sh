@@ -40,7 +40,7 @@ PARSED=$(POSIXLY_CORRECT=yes $GETOPT --name "$0" -u \
 eval echo "$PARSED" > /dev/null || { usage; exit 2; }
 
 while [[ "$1" != "" ]]; do
-  ERR="echo 'Unknown Error! '$1'='$2"
+  ERR="'Unknown Error! '$1'='$2"
   case "$1" in
     -c|--cross-compile)  CROSS="$2";  shift 2 ;;
     -d|--date)           EPOCH="$2";  shift 2 ;;
@@ -140,7 +140,7 @@ RUN_DIR=$run_dir; RESULTS=results
 home=$HOME; path=$PATH; results=$RESULTS
 pushd_results="pushd $RESULTS >> $pushd_log"
 popd="popd -- >> $pushd_log"
-no_ai="$(sed -n 2p $0)"
+NO_AI="$(sed -n 2p $0)"
 local_data=$home/.local
 local_bin=$home/docker/bin
 local_lib=$home/docker/lib
@@ -379,7 +379,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     read -p \"🔐 Press enter to start attestation for \$2 \$3\"
     echo -e '\nStarting Syft...\n' && touch .pager1 && tail -f .pager1 & pid1=\$!
     syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest --output spdx-json docker.io/\$2 \
-    --platform linux/amd64,linux/arm64 \$src_att' /dev/null > .pager1\"
+    \$3 \$src_att' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
     kill \$pid1 && rm -f .pager1 && echo || exit 1
     
