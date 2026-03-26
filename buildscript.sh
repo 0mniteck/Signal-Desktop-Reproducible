@@ -319,10 +319,10 @@ mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- \
-ANAME=$ANAME BRANCH=$BRANCH CROSS=$CROSS DBUS_SESSION_BUS_ADDRESS=unix:path=$RUN_DIR/bus \
-EPOCH=$EPOCH GPG_TTY=\$(/bin/tty) HOME=$HOME INC=$INC MOUNT=$MOUNT NO_AI=$NO_AI OCI=$OCI PATH=$PATH \
-POPD=$popd PUSH=$PUSH PUSHD_LOG=$pushd_log PUSHD_RESULTS=$pushd_results RESULTS=$RESULTS SKIP_LOGIN=$SKIP_LOGIN \
-SSH_CONF=\$(<$HOME/.ssh/config) TAG=$TAG TERM=$TERM TEST=$TEST TRIPL=$TRIPL XDG_RUNTIME_DIR=$RUN_DIR \
+ANAME='$ANAME' BRANCH='$BRANCH' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' \
+EPOCH='$EPOCH' GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' \
+POPD=$popd PUSH=$PUSH PUSHD_LOG='$pushd_log' PUSHD_RESULTS='$pushd_results' RESULTS='$RESULTS' SKIP_LOGIN='$SKIP_LOGIN' \
+SSH_CONF='\$(<$HOME/.ssh/config)' TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' \
 || exit 1
 
 eval \"\$(ssh-agent -s)\" >> $nulled && wait
