@@ -15,7 +15,7 @@ declare -- DEVICEFLOW_AUTH=$CLIENT_ID:$CLIENT_KEY
 git config --global user.name $USER
 git config --global user.email $USER_ID
 git config --global user.signingkey $SIGNING_KEY
-
+git config --global init.defaultBranch main
 if [[ "$SKIP_LOGIN" == "" ]]; then
 echo '-----BEGIN PGP PUBLIC KEY BLOCK-----
 
