@@ -15,11 +15,11 @@ https://github.com/nvm-sh/nvm/raw/v$NVM_VERSION/install.sh /
 
 ADD --checksum=$COMMIT --keep-git-dir=true https://github.com/signalapp/Signal-Desktop.git?branch=$BRANCH.x&checksum=$COMMIT /Signal-Desktop
 
-RUN mkdir -p /Signal-Desktop/artifacts/linux/logs $NVM_DIR && gem install fpm && \
-    chmod +x install.sh && ./install.sh && . $NVM_DIR/nvm.sh && rm -f /install.sh && \
-    nvm install $NODE_VERSION && nvm alias $NODE_VERSION && nvm use $NODE_VERSION && \
-    git config --global --add safe.directory /project && \
-    npm install --location=global pnpm@$PNPM_VERSION
+RUN mkdir -p /Signal-Desktop/artifacts/linux/logs $NVM_DIR && gem install fpm \
+    && chmod +x install.sh && ./install.sh && . $NVM_DIR/nvm.sh && rm -f /install.sh \
+    && nvm install $NODE_VERSION && nvm alias $NODE_VERSION && nvm use $NODE_VERSION \
+    && git config --global --add safe.directory /project \
+    && npm install --location=global pnpm@$PNPM_VERSION
 
 ENTRYPOINT ["signal-buildscript.sh"]
 CMD ["no",""]
