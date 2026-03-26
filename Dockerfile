@@ -5,7 +5,7 @@ ARG BUILDKIT_SBOM_SCAN_CONTEXT=true BUILDKIT_SBOM_SCAN_STAGE=signal-desktop SOUR
 
 FROM $SOURCE AS signal-desktop
 ARG NODE_VERSION NVM_VERSION PNPM_VERSION BRANCH COMMIT SOURCE_DATE_EPOCH
-ENV CI=true SIGNAL_ENV=production USE_SYSTEM_FPM=true NVM_DIR=/usr/local/nvm PNPM_HOME=/tmp/.pnpm-home NPM_CONFIG_CACHE=/tmp/.npm-cache
+ENV SIGNAL_ENV=production USE_SYSTEM_FPM=true NVM_DIR=/usr/local/nvm PNPM_HOME=/tmp/.pnpm-home NPM_CONFIG_CACHE=/tmp/.npm-cache
 ENV NODE_PATH=$NVM_DIR/v$NODE_VERSION/lib/node_modules PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
 COPY signal-buildscript.sh /usr/local/bin/
 ADD --checksum=sha256:f78ebf9776234423b69cdef1ab1698ebb2a7666cb0ac0f8c823d7862d1f8f851 \
