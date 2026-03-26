@@ -1,4 +1,4 @@
-declare -- node_ver=24.13.0
+declare -- node_ver=24.14.0
 declare -- nvm_ver=0.40.4
 declare -- pnpm_ver=10.18.1
 declare -- docker_snap_arm64_ver=3380
