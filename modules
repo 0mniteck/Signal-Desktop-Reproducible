@@ -76,7 +76,7 @@ fi
 docker run -it --cpus=$(nproc) \
   --network=host,\"driver-opt=network=host\" \
   --platform linux/$ANAME --cgroupns private \
-  --name $MODULE -e SOURCE_DATE_EPOCH=$SDE \
+  --name $MODULE --pull -e SOURCE_DATE_EPOCH=$SDE \
   $(cat $RESULTS/$ANAME/$MODULE.manifest.ref) \
   $TEST $SIGNING_KEY || return 78
 
