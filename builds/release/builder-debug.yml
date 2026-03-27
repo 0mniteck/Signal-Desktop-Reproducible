@@ -9,6 +9,9 @@ arm64:
     - '!ts/scripts/**'
     - '!build'
     - '!ts/{storybook,test-helpers,test-node,test-mock,test-electron}'
+    - '!ts/**/*.preload.js'
+    - ts/windows/sticker-creator/preload.preload.js
+    - '!ts/**/*.dom.js'
     - '!**/{tsconfig,bower,component}.json'
     - '!**/.{github,husky,grenrc,npmrc,nycrc,taprc,bithoundrc}'
     - '!**/.testem.json'
@@ -50,7 +53,6 @@ arm64:
     - node_modules/emoji-datasource/categories.json
     - node_modules/emoji-datasource/emoji.json
     - '!node_modules/emoji-datasource-apple/**'
-    - '!node_modules/spellchecker/vendor/hunspell/**/*'
     - '!node_modules/@formatjs/intl-displaynames/**/*'
     - '!node_modules/@formatjs/intl-listformat/**/*'
     - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,test,__tests__,tests,powered-test,example,examples,*.d.ts,*.d.ts.map,*.js.map,*.gypi,.snyk-*.flag,benchmark}'
@@ -61,9 +63,6 @@ arm64:
     - '!**/*.{o,hprof,orig,pyc,pyo,rbc,c,h,m}'
     - '!**/._*'
     - '!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,__pycache__,thumbs.db,.gitignore,.gitattributes,.flowconfig,.yarn-metadata.json,.idea,appveyor.yml,.travis.yml,circle.yml,npm-debug.log,.nyc_output,yarn.lock,.yarn-integrity}'
-    - node_modules/spellchecker/build/Release/*.node
-    - node_modules/websocket/build/Release/*.node
-    - '!node_modules/websocket/builderror.log'
     - node_modules/socks/build/*.js
     - node_modules/socks/build/common/*.js
     - node_modules/socks/build/client/*.js
@@ -73,6 +72,8 @@ arm64:
     - '!node_modules/@signalapp/ringrtc/scripts/*'
     - node_modules/@signalapp/ringrtc/build/linux/*arm64*.node
     - node_modules/@signalapp/windows-ucv/build/Release/*.node
+    - node_modules/@signalapp/mute-state-change/build/Release/*.node
+    - node_modules/@signalapp/mute-state-change/build/Release/*.mm
     - node_modules/@indutny/simple-windows-notifications/prebuilds/linux-arm64/*.node
     - node_modules/@indutny/mac-screen-share/build/Release/*.node
     - node_modules/fs-xattr/build/Release/*.node
@@ -115,9 +116,9 @@ arm64:
     - screenShare.html
     - settings.html
     - permissions_popup.html
-    - calling_tools.html
     - debug_log.html
     - loading.html
+    - call_diagnostic.html
     - '!**/*.{iml,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,suo,xproj,cc,d.ts,mk,a,o,obj,forge-meta,pdb}'
     - '!**/._*'
     - '!**/electron-builder.{yaml,yml,json,json5,toml,ts}'
@@ -134,6 +135,9 @@ arm64:
     - '!ts/scripts/**'
     - '!build'
     - '!ts/{storybook,test-helpers,test-node,test-mock,test-electron}'
+    - '!ts/**/*.preload.js'
+    - ts/windows/sticker-creator/preload.preload.js
+    - '!ts/**/*.dom.js'
     - '!**/{tsconfig,bower,component}.json'
     - '!**/.{github,husky,grenrc,npmrc,nycrc,taprc,bithoundrc}'
     - '!**/.testem.json'
@@ -174,7 +178,6 @@ arm64:
     - node_modules/emoji-datasource/categories.json
     - node_modules/emoji-datasource/emoji.json
     - '!node_modules/emoji-datasource-apple/**'
-    - '!node_modules/spellchecker/vendor/hunspell/**/*'
     - '!node_modules/@formatjs/intl-displaynames/**/*'
     - '!node_modules/@formatjs/intl-listformat/**/*'
     - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,test,__tests__,tests,powered-test,example,examples,*.d.ts,*.d.ts.map,*.js.map,*.gypi,.snyk-*.flag,benchmark}'
@@ -185,9 +188,6 @@ arm64:
     - '!**/*.{o,hprof,orig,pyc,pyo,rbc,c,h,m}'
     - '!**/._*'
     - '!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,__pycache__,thumbs.db,.gitignore,.gitattributes,.flowconfig,.yarn-metadata.json,.idea,appveyor.yml,.travis.yml,circle.yml,npm-debug.log,.nyc_output,yarn.lock,.yarn-integrity}'
-    - node_modules/spellchecker/build/Release/*.node
-    - node_modules/websocket/build/Release/*.node
-    - '!node_modules/websocket/builderror.log'
     - node_modules/socks/build/*.js
     - node_modules/socks/build/common/*.js
     - node_modules/socks/build/client/*.js
@@ -197,6 +197,8 @@ arm64:
     - '!node_modules/@signalapp/ringrtc/scripts/*'
     - node_modules/@signalapp/ringrtc/build/linux/*arm64*.node
     - node_modules/@signalapp/windows-ucv/build/Release/*.node
+    - node_modules/@signalapp/mute-state-change/build/Release/*.node
+    - node_modules/@signalapp/mute-state-change/build/Release/*.mm
     - node_modules/@indutny/simple-windows-notifications/prebuilds/linux-arm64/*.node
     - node_modules/@indutny/mac-screen-share/build/Release/*.node
     - node_modules/fs-xattr/build/Release/*.node
@@ -239,6 +241,6 @@ arm64:
     - screenShare.html
     - settings.html
     - permissions_popup.html
-    - calling_tools.html
     - debug_log.html
     - loading.html
+    - call_diagnostic.html

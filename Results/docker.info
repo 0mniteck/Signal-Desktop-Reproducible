@@ -1,0 +1,96 @@
+Client:
+ Version:           28.4.0
+ API version:       1.51
+ Go version:        go1.24.6
+ Git commit:        d8eb465
+ Built:             Thu Sep 11 16:46:32 2025
+ OS/Arch:           linux/arm64
+ Context:           default
+
+Server:
+ Engine:
+  Version:          28.4.0
+  API version:      1.51 (minimum version 1.24)
+  Go version:       go1.24.6
+  Git commit:       249d679
+  Built:            Thu Sep 11 16:47:14 2025
+  OS/Arch:          linux/arm64
+  Experimental:     false
+ containerd:
+  Version:          v1.7.27
+  GitCommit:        05044ec0a9a75232cad458027ca83437aae3f4da
+ runc:
+  Version:          1.2.6
+  GitCommit:        
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+ rootlesskit:
+  Version:          2.0.2
+  ApiVersion:       1.1.1
+  NetworkDriver:    slirp4netns
+  StateDir:         /home/shant/.local/share/rootless/tmp
+ slirp4netns:
+  Version:          1.2.1
+  GitCommit:        09e31e92fa3d2a1d3ca261adaeb012c8d75a8194
+
+Client:
+ Version:    28.4.0
+ Context:    default
+ Debug Mode: false
+ Plugins:
+  buildx: Docker Buildx (Docker Inc.)
+    Version:  v0.24.0
+    Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+  compose: Docker Compose (Docker Inc.)
+    Version:  v2.39.1
+    Path:     /usr/libexec/docker/cli-plugins/docker-compose
+
+Server:
+ Containers: 0
+  Running: 0
+  Paused: 0
+  Stopped: 0
+ Images: 1
+ Server Version: 28.4.0
+ Storage Driver: overlay2
+  Backing Filesystem: extfs
+  Supports d_type: true
+  Using metacopy: false
+  Native Overlay Diff: true
+  userxattr: true
+ Logging Driver: json-file
+ Cgroup Driver: systemd
+ Cgroup Version: 2
+ Plugins:
+  Volume: local
+  Network: bridge host ipvlan macvlan null overlay
+  Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+ Swarm: inactive
+ Runtimes: io.containerd.runc.v2 runc
+ Default Runtime: runc
+ Init Binary: /snap/docker/3380/bin/docker-init
+ containerd version: 05044ec0a9a75232cad458027ca83437aae3f4da
+ runc version: 
+ init version: de40ad0
+ Security Options:
+  seccomp
+   Profile: builtin
+  rootless
+  cgroupns
+ Kernel Version: 6.17.0-7-generic
+ Operating System: Ubuntu 25.10
+ OSType: linux
+ Architecture: aarch64
+ CPUs: 6
+ Total Memory: 3.712GiB
+ Name: rock1
+ ID: 53e0c46e-8efd-46bd-9407-920965e8e95b
+ Docker Root Dir: /home/shant/.local/share/docker
+ Debug Mode: false
+ Experimental: false
+ Insecure Registries:
+  ::1/128
+  127.0.0.0/8
+ Live Restore Enabled: false
+
