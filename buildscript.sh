@@ -166,6 +166,7 @@ Type=exec\\
 Group=$run_as\\
 ExitType=cgroup\\
 Slice=docker.slice\\
+Delegate=cpu\\ cpuset\\ io\\ memory\\ pids\\
 ___EOF
 )
 
@@ -604,8 +605,12 @@ cat >> $rootless_path.sh << ____EOF
 $debug && export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker
 > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
-rootlesskit --copy-up=/etc --copy-up=/run --net=slirp4netns --disable-host-loopback \
---state-dir $rootless_path/tmp /bin/bash --norc --noprofile -i -c '
+XDG_SID=$(echo \$XDG_SESSION_ID)
+XSID=$(echo /sys/fs/cgroup/user.slice/user-$run_id.slice/session-\$XDG_SID.scope/slirp4)
+eval $(mkdir -p \$XSID) >> $nulled
+rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
+--ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=slirp4 \
+--state-dir=$rootless_path/tmp /bin/env -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
