@@ -68,9 +68,9 @@ if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   nulled=/dev/null
   pushd_log=$nulled
 elif [[ "$TEST" != *yes* ]]; then
-  ${TEST}="yes"
-  TESTS2="${TEST}=${!TEST}"
-  TESTS="$(eval echo $(echo ${TEST}))=$(eval echo $(echo \$${TEST}))"
+  echo ${TEST}="yes"
+  echo TESTS2="${TEST}=${!TEST}"
+  echo TESTS="$(eval echo $(echo ${TEST}))=$(eval echo $(echo \$${TEST}))"
   TEST="yes"
   debug="set -vx"
   usage
@@ -213,10 +213,14 @@ unmount() {
 }
 
 systemd_ctl_common() {
-  snap stop docker && wait
+  snap stop --disable docker && wait
   systemctl daemon-reload && wait
   systemctl reset-failed && wait
   systemctl stop snap.docker.* --all && wait
+  quiet systemctl $1 snap.docker.nvidia-container-toolkit --runtime $2
+  quiet systemctl $1 snap.docker.dockerd --runtime $2
+  quiet networkctl delete docker0
+  quiet networkctl delete tun0
 }
 
 quiet() {
@@ -250,11 +254,11 @@ for d in docker-daemon firewall-control network-bind network-control opengl priv
   snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && unset d && sleep 1 && echo
 
-systemd_ctl_common
-quiet systemctl mask snap.docker.nvidia-container-toolkit --runtime --now
-quiet systemctl mask snap.docker.dockerd --runtime --now
+systemd_ctl_common mask --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 quiet networkctl delete docker0
+quiet networkctl delete tun0
+
 
 clean_most || echo "Failed cleanup"
 rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
@@ -708,9 +712,9 @@ fi
 
 if [[ \"\$CROSS\" != *no* ]]; then
   if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-    docker run --privileged --cgroupns private --rm \$binfmt_arm64 --install amd64
+    docker run --privileged --cgroupns private --pull --rm \$binfmt_arm64 --install amd64
   elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-    docker run --privileged --cgroupns private --rm \$binfmt_amd64 --install arm64
+    docker run --privileged --cgroupns private --pull --rm \$binfmt_amd64 --install arm64
   else
     echo 'Unknown Architecture '\$(uname -m) && exit 1
   fi
@@ -764,11 +768,8 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 clean_all || echo "Failed cleanup"
-quiet systemctl unmask snap.docker.nvidia-container-toolkit --runtime
-quiet systemctl unmask snap.docker.dockerd --runtime
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
-quiet networkctl delete docker0
-systemd_ctl_common
+systemd_ctl_common unmask
 
 if [[ -d $home/$snap_path ]]; then
   lsofd2=$(echo $(lsof -F p $home/$snap_path 2>> $nulled || true) | cut -d'p' -f2)
