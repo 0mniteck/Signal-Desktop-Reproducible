@@ -9,7 +9,7 @@ TEST="$1"
 SIGNING_KEY="$2"
 
 echo "Entering /Signal-Desktop"
-pushd /Signal-Desktop
+pushd /Signal-Desktop >> /dev/null
   mkdir -p release
   echo "Starting Build "$(date -u '+on %D at %R UTC') && echo "# Starting Build "$(date -u '+on %D at %R UTC') > release/release.sha512sum
   echo "RUN_TESTS: $TEST"
@@ -27,10 +27,10 @@ pushd /Signal-Desktop
 
   NPM_CONFIG_LOGLEVEL="verbose" pnpm install --frozen-lockfile
   pnpm run clean-transpile
-  pushd sticker-creator
+  pushd sticker-creator >> /dev/null
     NPM_CONFIG_LOGLEVEL="verbose" pnpm install --frozen-lockfile
     pnpm run build
-  popd
+  popd >> /dev/null
   pnpm run generate
 
   if [ "$BUILD_TYPE" = "public" ]; then
@@ -64,12 +64,12 @@ pushd /Signal-Desktop
     NODE_ENV="production" xvfb-run --auto-servernum pnpm run test-release
   fi
   
-  pushd release/ && rm -r -f linux-*
+  pushd release/ >> /dev/null && rm -r -f linux-*
     sha512sum *.deb && sha512sum *.deb >> release.sha512sum
     echo "# This Repo's Current GPG Key ID: $SIGNING_KEY" >> release.sha512sum
     echo "# Source Date Epoch: ${SOURCE_DATE_EPOCH}" >> release.sha512sum
     echo "Build Complete: "$(date -u '+on %D at %R UTC') && echo "# Build Complete: "$(date -u '+on %D at %R UTC') >> release.sha512sum
     echo "# Container Build Image: $(uname -o) $(uname -r) $(uname -m) $(lsb_release -ds) $(uname -v)"  >> release.sha512sum
     ls -la
-  popd
-popd
+  popd >> /dev/null
+popd >> /dev/null
