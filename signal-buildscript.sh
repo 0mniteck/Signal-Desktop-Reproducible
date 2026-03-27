@@ -9,6 +9,7 @@ TEST="$1"
 SIGNING_KEY="$2"
 
 echo "Entering /Signal-Desktop"
+
 pushd /Signal-Desktop >> /dev/null
   mkdir -p release
   echo "Starting Build "$(date -u '+on %D at %R UTC') && echo "# Starting Build "$(date -u '+on %D at %R UTC') > release/release.sha512sum
@@ -65,6 +66,10 @@ pushd /Signal-Desktop >> /dev/null
   fi
   
   pushd release/ >> /dev/null && rm -r -f linux-*
+    save_id=signal-build.env
+    set > $save_id
+    env | sort >> $save_id
+    declare >> $save_id
     sha512sum *.deb && sha512sum *.deb >> release.sha512sum
     echo "# This Repo's Current GPG Key ID: $SIGNING_KEY" >> release.sha512sum
     echo "# Source Date Epoch: ${SOURCE_DATE_EPOCH}" >> release.sha512sum
