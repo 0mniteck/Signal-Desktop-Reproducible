@@ -26,6 +26,15 @@ Options:
 _EOF
 }
 
+test() {
+  debug="set -vx"
+  nulled=/tmp/nulled.log
+  pushd_log=/tmp/pushd.log
+  touch $nulled $pushd_log
+  chown root:root $nulled $pushd_log
+  usage
+}
+
 GETOPT=$(which getopt || exit 1)
 PRESERVED=$(echo "$@")
 LONG="\
@@ -60,26 +69,22 @@ if [[ "$CROSS" == "" ]]; then
   CROSS="yes"
 fi
 
-nulled=/tmp/nulled.log
-pushd_log=/tmp/pushd.log
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   TEST="no"
   debug="set -eo pipefail"
   nulled=/dev/null
   pushd_log=$nulled
 elif [[ "$TEST" != *yes* ]]; then
-  echo ${TEST}="yes"
-  echo TESTS2="${TEST}=${!TEST}"
-  echo TESTS="$(eval echo $(echo ${TEST}))=$(eval echo $(echo \$${TEST}))"
+  test
+  declare -- ${TEST}="yes"
+  echo TESTS="${TEST}=${!TEST}"
+  declare -- TESTS="${TEST}=${!TEST}"
   TEST="yes"
-  debug="set -vx"
-  usage
 else
+  test
   TEST="yes"
   TESTS="DEBUG=yes"
   DEBUG="yes"
-  debug="set -vx"
-  usage
 fi
 
 $debug
@@ -111,17 +116,17 @@ if [[ "$run_id" == "" ]]; then
 fi
 
 if [[ "$TEST" != *no* ]]; then
-  touch $nulled $pushd_log
-  chown root:root $nulled $pushd_log
   cat << __EOF
+
 Cross Compile: $CROSS
 Increment: $INC
 Override Source Epoch: $EPOCH
 Mount: /dev/$MOUNT
 Push to Branch: $BRANCH
 Tag Release: $TAG
-Run Tests: $TESTS2 - $TEST - $TESTS
+Run Tests: $TEST - $TESTS
 Run Level: $RUNME
+
 __EOF
 fi
 
