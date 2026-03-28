@@ -500,6 +500,8 @@ sys_ctl_common() {
   systemctl --user reset-failed && wait
   systemctl --user stop docker* --all && wait
   grep 0 <(systemctl --user list-units docker* --all --no-pager) || exit 1
+  systemctl --user start dbus && wait
+  grep active <(systemctl --user is-active dbus) || exit 1
 }
 
 subver() {
