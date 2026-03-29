@@ -109,7 +109,7 @@ if [[ "$run_id" == "" ]]; then
     echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1
   else
     echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 --runme $(id -u) $PRESERVED'\n"
-    argv_run="exec pkexec --keep-cwd '$0' --runme $(id -u) $PRESERVED"
+    argv_run="exec pkexec --keep-cwd '$0' -e $(id -u) $PRESERVED"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $HOME/.casts/$repo && exec asciinema rec --overwrite -i 3 -t "$TRIPL" $HOME/.casts/$TRIPL.cast -c "$argv_run"
     else
@@ -207,7 +207,7 @@ clean_all() {
 }
 
 unmount() {
-  quiet snap disable docker && sleep 1
+  quiet snap stop --disable docker && sleep 1
   if [[ -d $docker_data ]]; then
     lsofd=$(echo $(lsof -F p $docker_data 2>> $nulled || true) | cut -d'p' -f2)
     if [[ "$lsofd" -gt 0 ]]; then
@@ -220,13 +220,13 @@ unmount() {
   rm -r -f $docker_data/ && sync
 }
 
-systemd_ctl_common() {
-  snap stop --disable docker && sleep 1
-  systemctl daemon-reload && wait
-  systemctl reset-failed && wait
-  systemctl stop snap.docker.* --all && wait
-  quiet systemctl $1 snap.docker.nvidia-container-toolkit --runtime $2
-  quiet systemctl $1 snap.docker.dockerd --runtime $2
+systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep, $3 = --now
+  snap stop --disable docker && $2
+  systemctl daemon-reload && $2
+  systemctl reset-failed && $2
+  systemctl stop snap.docker.* --all && $2
+  quiet systemctl $1 snap.docker.nvidia-container-toolkit --runtime $3
+  quiet systemctl $1 snap.docker.dockerd --runtime $3
   quiet networkctl delete docker0
   quiet networkctl delete tun0
 }
@@ -254,6 +254,7 @@ snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
 snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
 
+snap set docker nvidia-support.runtime.config-override="$(cat <(echo))" && \
 snap set docker nvidia-support.disabled=true && \
 echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" || \
 echo "Failed to disable docker:nvidia-support"
@@ -262,7 +263,7 @@ for d in docker-daemon firewall-control network-bind network-control opengl priv
   snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && unset d && sleep 1 && echo
 
-systemd_ctl_common mask --now
+systemd_ctl_common mask wait --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed cleanup"
 
@@ -309,6 +310,14 @@ if [[ "$TEST" != *no* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log
   rootless_path=$home/rootless
+  LESSSECURE=1
+  SYSTEMD_URLIFY=false
+  SYSTEMD_LOG_LEVEL=debug
+  SYSTEMD_LOG_COLOR=false
+  SYSTEMD_LOG_LOCATION=true
+  SYSTEMD_LOG_TARGET=console
+  SYSTEMD_LOG_TIME=true
+  SYSTEMD_COLORS=false
   debug_cat="journalctl -o cat -t USR_RNLVL -f"
   systemd_cat="systemd-cat -t USR_RNLVL -p debug"
 else
@@ -324,10 +333,10 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-seen="$(cat <(find /sys/fs/cgroup/user.slice/user-${run_id}.slice -type d))"
-$(while [[ ! -f $rootless_path/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-${run_id}.slice/session-$(cat $rootless_path/xs.id).scope/slirp4; rm -f $rootless_path/xs.id) &
-$debug_cat &
-$systemd_cat machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
+seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
+$(sleep 10; while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id) &
+$($debug_cat) & sleep 5
+$systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
@@ -339,13 +348,13 @@ GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI
 PUSH='$PUSH' PUSHD_LOG='$pushd_log' PUSHD_RESULTS='$pushd_results' RESULTS='$RESULTS' SSH_CONF='\$(<$HOME/.ssh/config)' \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
-seen=\"$seen\"
-seen2=\"\$(cat \<\(find /sys/fs/cgroup/user.slice/user-${run_id}.slice -type d\))\"
-seend=\$(diff \<\(echo \$seen | tr ' ' '\n'\) \<\(echo \$seen2 | tr ' ' '\n'\) | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)
+seen1=\"$seen\"
+seen2=\"\$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))\"
+seend=\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)
 xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
-echo \$xsid > $rootless_path/xs.id
+echo \$xsid > $docker_data/xs.id
 echo XSID=\$xsid SEEND=\$seend
-while [[ -f $rootless_path/xs.id ]]; do sleep 5; done; mkdir -p \$seend/slirp4 || exit 1
+while [[ -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p \$seend/slirp4 || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -405,7 +414,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     kill \$pid1 && rm -f .pager1 && echo || exit 1
     
     sleep 5 && echo docker.io/\$2@\$(cat \$1.image.id) > \$1.index.ref
-    docker buildx imagetools inspect --format {{ json .Provenance }} \$(cat \$1.index.ref) > \$1.provenance.json
+    docker buildx imagetools inspect --format {{ json .Provenance.SLSA }} \$(cat \$1.index.ref) > \$1.provenance.json
     docker buildx imagetools inspect --format {{ .Manifest }} \$(cat \$1.index.ref) > \$1.manifest.md
     jsin=\$(docker buildx imagetools inspect --format {{ json . }} \$(cat \$1.index.ref))
     
@@ -430,7 +439,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
         --certificate-identity \$SIGSTORE_USR --type spdxjson \
         > \$1.sig.bundle' /dev/null > \$1.attested\"
       quiet \$cosign_run || quiet \$cosign_run || exit 1
-      cat \$1.attested && $popd
+      cat \$1.attested && \$POPD
     done && unset arr
   else
     echo 'Skipping Attestations: Docker Hub: not logged in...'
@@ -464,7 +473,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
     kill \$pid3 && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
   	echo \$R' - Grype Scan Results - '\$(grype --version) > \$1.vulns
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
-  $popd
+  \$POPD
   else
     echo 'Skipping Syft and Grype: Docker Hub: not logged in...'
   fi
@@ -488,7 +497,7 @@ Host .pki
 }
 
 drop_down() {
-  set +x; set +v; read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
+  set +xv; read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
   /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; export -- HOME=$HOME PATH=\$PATH TERM=$TERM; \
   echo source .identity; echo source .pinned_ver; echo source $rootless_path/tmp/env-rootless.exp; \
   echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; echo \"echo -e '\nDropped down to interactive shell. \
@@ -497,19 +506,19 @@ drop_down() {
 }
 
 clean_some() {
-  rm -r -f $home/docker/
-  rm -r -f $home/.docker/
-  rm -r -f $data_dir/rootless*
-  rm -r -f $data_dir/systemd/
+  rm -r -f $home/docker/ \
+  $home/.docker/ \
+  $data_dir/rootless* \
+  $data_dir/systemd/
 }
 
 sys_ctl_common() {
   systemctl --user daemon-reload && wait
   systemctl --user reset-failed && wait
   systemctl --user stop docker* --all && wait
-  grep 0 \<\(systemctl --user list-units docker* --all --no-pager\) || exit 1
   systemctl --user start dbus && wait
-  grep inactive \<\(grep active \<\(systemctl --user is-active dbus\) || exit 1\) && exit 1
+  grep 0 <(systemctl --user list-units docker* --all --no-pager) || exit 1
+  grep inactive <(grep active <(systemctl --user is-active dbus) || exit 1) && exit 1
 }
 
 subver() {
@@ -579,7 +588,7 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   fi
 fi
 
-source_date_epoch=1
+unset source_date_epoch
 if [[ \"\$EPOCH\" == *today* ]]; then
   timestamp=\$(date -d \$(date +%D) +%s);
   if [[ \"\$timestamp\" != \"\" ]]; then
@@ -596,9 +605,8 @@ else
   timestamp=\$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)
   if [[ \"\$timestamp\" != \"\" ]]; then
     echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\"
+    cp $results/release.sha512sum /tmp/release.last.sha512sum && check_file=yes || exit 1
     source_date_epoch=\$((timestamp))
-    check_file=1
-    cp $results/release.sha512sum /tmp/release.last.sha512sum
   else
     echo \"Can't get latest commit timestamp. Defaulting to 1.\"
     source_date_epoch=1
@@ -678,7 +686,7 @@ else
   echo -e \$rootless > $rootless_path/tmp/rootless.status
 fi
 
-$pushd_results && pushd env >> $pushd_log
+\$PUSHD_RESULTS && pushd env >> $pushd_log
   save_id=$run_id:$run_id.env
   set > \$save_id
   env | sort >> \$save_id
@@ -693,7 +701,7 @@ $pushd_results && pushd env >> $pushd_log
   quiet '$docker buildx version >> docker.info'
   echo -e '\nBuildx Inspect:\n' >> docker.info
   quiet '$docker buildx inspect --bootstrap >> docker.info'
-$popd && $popd
+\$POPD && \$POPD
 
 if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
@@ -725,9 +733,9 @@ fi
 
 if [[ \"\$CROSS\" != *no* ]]; then
   if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-    docker run --privileged --cgroupns private --pull --rm \$binfmt_arm64 --install amd64
+    docker run --privileged --cgroupns private --pull --rm $binfmt_arm64 --install amd64
   elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-    docker run --privileged --cgroupns private --pull --rm \$binfmt_amd64 --install arm64
+    docker run --privileged --cgroupns private --pull --rm $binfmt_amd64 --install arm64
   else
     echo 'Unknown Architecture '\$(uname -m) && exit 1
   fi
@@ -749,13 +757,13 @@ else
   drop_down || exit \$PIPESTATUS
 fi
 
-$pushd_results
+\$PUSHD_RESULTS
   scan_using_grype ubuntu \"/ --select-catalogers directory\"
   touch readme.md && cat */*.vulns >> readme.md && cat *.vulns >> readme.md
   sed -i 's/^/#### /g' readme.md && echo '\`\`\`' >> readme.md
   cat *.index.ref >> readme.md && cat */*.manifest.ref >> readme.md
   cat readme.md && echo
-$popd
+\$POPD
 
 if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   git status && git add -A && git status && confirm 'git commit - git@ssh'
@@ -770,7 +778,7 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
 fi
 
 docker-credential-pass erase &
-ssh-add -D && eval \"\$(ssh-agent -k)\"
+ssh-add -D && eval \$(ssh-agent -k)
 clean_some && sys_ctl_common"
 
 if [[ "$TEST" == "yes" ]]; then
@@ -782,7 +790,7 @@ fi
 
 clean_all || echo "Failed cleanup"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
-systemd_ctl_common unmask
+systemd_ctl_common unmask sleep\ 1
 
 if [[ -d $home/$snap_path ]]; then
   lsofd2=$(echo $(lsof -F p $home/$snap_path 2>> $nulled || true) | cut -d'p' -f2)
@@ -801,5 +809,4 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
-
 exit 0
