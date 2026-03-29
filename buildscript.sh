@@ -306,12 +306,13 @@ pushd $docker_data >> $pushd_log
   snap debug execution snap >> snap.info
   snap debug execution apparmor >> snap.info
   snap debug sandbox-features >> snap.info
-  save_id=$(id -u):$(id -u).env
+  id=$(id -u)
+  save_id=$id:$id.env
   set > $save_id
   env | sort >> $save_id
   declare >> $save_id
   chown $run_as:$run_as $save_id snap.info
-popd -- >> $pushd_log
+popd -- >> $pushd_log && unset save_id id
 
 if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
@@ -337,9 +338,9 @@ else
 fi
 
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
-$(sleep 10; while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; exit 0) &
-$($debug_cat) &
-sleep 5; $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
+$(sleep 10 && while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done && mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4 && rm -f $docker_data/xs.id && exit 0 || exit 1) & mkpid=$!
+$debug_cat & pid0=$!
+sleep 5 && $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
@@ -357,7 +358,7 @@ seend=\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep
 xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
 echo \$xsid > $docker_data/xs.id
 echo XSID=\$xsid SEEND=\$seend
-while [[ -f $docker_data/xs.id ]]; do sleep 5; done && mkdir -p \$seend/slirp4 || exit 1
+while [[ -f $docker_data/xs.id ]]; do sleep 5; done && kill $mkpid 2>> $nulled | true && mkdir -p \$seend/slirp4 || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -414,7 +415,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest --output spdx-json docker.io/\$2 \
     \$3 \$src_att' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
-    kill \$pid1 && rm -f .pager1 && echo || exit 1
+    kill \$pid1 2>> $nulled | true && rm -f .pager1 && echo || exit 1
     
     sleep 5 && echo docker.io/\$2@\$(cat \$1.image.id) > \$1.index.ref
     docker buildx imagetools inspect --format {{ json .Provenance.SLSA }} \$(cat \$1.index.ref) > \$1.provenance.json
@@ -465,7 +466,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
     touch \$1.syft.tmp && tail -f \$1.syft.tmp & pid2=\$!
     syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
     quiet \$syft_run || quiet \$syft_run || exit 1
-    kill \$pid2 && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
+    kill \$pid2 2>> $nulled | true && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
     echo \$R' - Syft Scan Results - '\$(syft --version) > \$1.contents
   	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
     
@@ -473,7 +474,7 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
     touch \$1.grype.tmp && tail -f \$1.grype.tmp & pid3=\$!
     script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
     -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
-    kill \$pid3 && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
+    kill \$pid3 2>> $nulled | true && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
   	echo \$R' - Grype Scan Results - '\$(grype --version) > \$1.vulns
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
   \$POPD
@@ -696,8 +697,8 @@ fi
   declare >> \$save_id
   mv $docker_data/{0:0.env,snap.info} .
   cp $rootless_path/env-docker docker.env
-  echo -e '\nDocker Version:\n' >> docker.info
-  quiet '$docker version > docker.info'
+  echo -e '\nDocker Version:\n' > docker.info
+  quiet '$docker version >> docker.info'
   echo -e '\nDocker Info:\n' >> docker.info
   quiet '$docker info >> docker.info'
   echo -e '\nBuildx Version:\n' >> docker.info
@@ -787,6 +788,9 @@ clean_some && sys_ctl_common"
 if [[ "$TEST" == "yes" ]]; then
   chown root:root $nulled $pushd_log
 fi
+
+kill $pid0 2>> $nulled || true
+
 if [[ "$MOUNT" != "" ]]; then
     unmount
 fi
@@ -812,4 +816,5 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
+
 exit 0
