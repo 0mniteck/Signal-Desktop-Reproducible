@@ -111,9 +111,9 @@ module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
 arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
 amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
 export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin TRIPL=$repo/$module:$real_date
-
+unset id; id=$(id -u)
+  
 if [[ "${run_id}" == "" ]]; then
-  unset id; id=$(id -u)
   if [[ "$(whoami)" == *root* || "${id}" == "0" ]]; then
     echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1
   else
