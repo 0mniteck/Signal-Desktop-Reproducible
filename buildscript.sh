@@ -258,6 +258,8 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     uidmap+ golang-github*- golang-docker*- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
+echo "options overlay metacopy=on" > /etc/modprobe.d/metacopy.conf
+modprobe overlay && wait && echo "Y" | tee /sys/module/overlay/parameters/metacopy
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
