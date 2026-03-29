@@ -143,9 +143,6 @@ else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
-xsid=$XDG_SESSION_ID
-$(echo /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$XDG_SID.scope/slirp4)
-eval $(mkdir -p \$XSID) >> $nulled
 RUN_DIR=$run_dir; RESULTS=results
 home=$HOME; path=$PATH; results=$RESULTS
 pushd_results="pushd $RESULTS >> $pushd_log"
@@ -290,6 +287,12 @@ if [[ "$TESTS" != *SKIP_LOGIN* ]]; then
   quiet $set_facl || quiet $set_facl || exit 1
 fi
 
+if [[ "$MOUNT" != "" ]]; then
+  systemd-cryptsetup attach $module /dev/$MOUNT && sleep 1 && echo
+  mount /dev/mapper/$module $docker_data && sleep 1
+  rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
+fi
+
 pushd $docker_data >> $pushd_log
   snap version > snap.info
   snap debug execution snap >> snap.info
@@ -302,11 +305,6 @@ pushd $docker_data >> $pushd_log
   chown $run_as:$run_as $save_id snap.info
 $popd
 
-if [[ "$MOUNT" != "" ]]; then
-  systemd-cryptsetup attach $module /dev/$MOUNT && sleep 1 && echo
-  mount /dev/mapper/$module $docker_data && sleep 1
-  rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
-fi
 if [[ "$TEST" != *no* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log
@@ -317,6 +315,7 @@ else
   push="--push"
   declare -- PUSH="$push"
 fi
+
 if [[ "$CROSS" == "yes" ]]; then
   DOUBLE="--platform linux/arm64,linux/amd64"
   declare -- CROSS="$DOUBLE"
@@ -802,4 +801,5 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
+
 exit 0
