@@ -253,13 +253,13 @@ clean_all || echo "Failed cleanup"
 
 apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ fuse-overlayfs+ gh+ git-lfs+ \
-                                                                    gnupg2+ gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
+                                                                    gnupg2+ gpg-agent+ iptables+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
                                                                     uidmap+ golang-github*- golang-docker*- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
 echo "options overlay metacopy=on" > /etc/modprobe.d/metacopy.conf
-modprobe overlay && wait && echo "Y" | tee /sys/module/overlay/parameters/metacopy
+modprobe -a ip_tables overlay && wait && echo "Y" | tee /sys/module/overlay/parameters/metacopy
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
