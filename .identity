@@ -10,13 +10,13 @@ declare -- SIGSTORE_USR=tiger-varsity-alto@duck.com
 declare -- USER_ID=10482171+0mniteck@users.noreply.github.com
 declare -- SIGNING_KEY=42E2DDF1E31B370F8BFFEE03287EE837E6ED2DD3
 declare -- CLIENT_ID=Iv23liF4fUl7FZ7MmEay
-declare -- CLIENT_KEY=04e0db1302073df52fad18abae4fc4ca1466edec
-declare -- DEVICEFLOW_AUTH=$CLIENT_ID:$CLIENT_KEY
+
 git config --global user.name $USER
 git config --global user.email $USER_ID
 git config --global user.signingkey $SIGNING_KEY
 git config --global init.defaultBranch main
-if [[ "$SKIP_LOGIN" == "" ]]; then
+
+if [[ "$TESTS" != *SKIP_LOGIN* ]]; then
 echo '-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQENBGUR6+QBCADbwEILdDDXamhAQbL7KlgFzoP3NI8+I2bCHHAUPYbpaCax0plM
