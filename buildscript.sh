@@ -113,9 +113,9 @@ export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin TRIPL=$repo/$modul
 
 if [[ "$run_id" == "" ]]; then
   if [[ "$(whoami)" == *root* ]]; then
-    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1
+    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 -e 1000 $PRESERVED'\n" && exit 1
   else
-    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 --runme $(id -u) $PRESERVED'\n"
+    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 -e $(id -u) $PRESERVED'\n"
     argv_run="exec pkexec --keep-cwd '$0' -e $(id -u) $PRESERVED"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $HOME/.casts/$repo && exec asciinema rec --overwrite -i 3 -t "$TRIPL" $HOME/.casts/$TRIPL.cast -c "$argv_run"
@@ -150,11 +150,12 @@ else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
-RUN_DIR=$run_dir; RESULTS=results
-home=$HOME; path=$PATH; results=$RESULTS
-pushd_results="pushd $RESULTS >> $pushd_log"
+home=$HOME; path=$PATH; term=$TERM; RUN_DIR=$run_dir
+results=results; RESULTS=$results
+pushd_results="pushd $results >> $pushd_log"
 popd="popd -- >> $pushd_log"
-NO_AI="$(sed -n 2p $0)"
+no_ai="$(sed -n 2p $0)"; NO_AI=$no_ai
+oci=org.opencontainers.image; OCI=$oci
 local_data=$home/.local
 local_bin=$home/docker/bin
 local_lib=$home/docker/lib
@@ -167,7 +168,6 @@ systemd_path=/etc/systemd/system
 systemd_service=$systemd_path/snap.docker.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
 var_docker=/var/snap/docker
-OCI=org.opencontainers.image
 snap_path=snap/docker/$docker_snap_ver
 docker_plugins=/$plugins_path/docker-
 docker_data=$data_dir/docker
