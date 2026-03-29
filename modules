@@ -85,7 +85,7 @@ docker cp $MODULE:/$NAME/release/ . && \
 mv release/release.sha*sum $RESULTS/ || return 78
 
 $PUSHD_RESULTS
-  if [[ "$check_file" == "1" ]]; then
+  if [[ "$check_file" == "yes" ]]; then
     cp /tmp/release.last.sha512sum release.last.sha512sum && \
     sha512sum -c release.last.sha512sum && REP="ly Reproduced" || return 78
   fi
