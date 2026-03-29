@@ -85,7 +85,7 @@ if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   pushd_log=$nulled
   TEST="no"
 elif [[ "$TEST" != *yes* ]]; then
-  debug="set -vx"
+  debug="set -vxeo pipefail"
   declare -- ${TEST}="yes"
   declare -- TESTS="${TEST}=${!TEST}"
   TEST="yes"
