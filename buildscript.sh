@@ -30,8 +30,12 @@ test() {
   debug="set -vx"
   nulled=/tmp/nulled.log
   pushd_log=/tmp/pushd.log
-  touch $nulled $pushd_log
-  chown root:root $nulled $pushd_log
+  if [[ "$RUNME" != "" ]]; then
+    chown root:root $nulled $pushd_log
+    rm -f $nulled $pushd_log
+    touch $nulled $pushd_log
+    > $nulled; > $pushd_log
+  fi
   usage
 }
 
@@ -70,21 +74,20 @@ if [[ "$CROSS" == "" ]]; then
 fi
 
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
-  TEST="no"
   debug="set -eo pipefail"
   nulled=/dev/null
   pushd_log=$nulled
+  TEST="no"
 elif [[ "$TEST" != *yes* ]]; then
   test
   declare -- ${TEST}="yes"
-  echo TESTS="${TEST}=${!TEST}"
   declare -- TESTS="${TEST}=${!TEST}"
   TEST="yes"
 else
   test
-  TEST="yes"
-  TESTS="DEBUG=yes"
   DEBUG="yes"
+  TESTS="DEBUG=yes"
+  TEST="yes"
 fi
 
 $debug
@@ -124,7 +127,7 @@ Override Source Epoch: $EPOCH
 Mount: /dev/$MOUNT
 Push to Branch: $BRANCH
 Tag Release: $TAG
-Run Tests: $TEST - $TESTS
+Run Tests: TEST=$TEST - TESTS=$TESTS - $TESTS
 Run Level: $RUNME
 
 __EOF
@@ -140,6 +143,9 @@ else
   echo 'Unknown Architecture '$(uname -m) && exit 1
 fi
 
+xsid=$XDG_SESSION_ID
+$(echo /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$XDG_SID.scope/slirp4)
+eval $(mkdir -p \$XSID) >> $nulled
 RUN_DIR=$run_dir; RESULTS=results
 home=$HOME; path=$PATH; results=$RESULTS
 pushd_results="pushd $RESULTS >> $pushd_log"
@@ -176,31 +182,31 @@ ___EOF
 )
 
 clean_most() {
-  rm -r -f /home/root/*
-  rm -r -f /root/snap/docker/
-  rm -r -f $docker_data*
-  rm -r -f $var_docker/common/*
-  rm -r -f $var_docker/$docker_snap_ver/*
-  rm -r -f $run_dir/containerd/
-  rm -r -f $run_dir/docker*
-  rm -r -f $run_dir/runc/
-  rm -r -f /run/containerd/
-  rm -r -f /run/docker*
-  rm -r -f /run/runc/
-  rm -r -f /run/snap.docker/
+  rm -r -f /home/root/* \
+  /root/snap/docker/ \
+  $docker_data* \
+  $var_docker/common/* \
+  $var_docker/$docker_snap_ver/* \
+  $run_dir/containerd/ \
+  $run_dir/docker* \
+  $run_dir/runc/ \
+  /run/containerd/ \
+  /run/docker* \
+  /run/runc/ \
+  /run/snap.docker/
 }
 
 clean_all() {
-  rm -r -f $home/$snap_path/*
-  rm -r -f $home/snap/docker/
-  rm -r -f $home/docker/
-  rm -r -f $home/.docker/
-  rm -r -f $data_dir/rootless*
-  rm -r -f $data_dir/systemd/
+  rm -r -f $home/$snap_path/* \
+  $home/snap/docker/ \
+  $home/docker/ \
+  $home/.docker/ \
+  $data_dir/rootless* \
+  $data_dir/systemd/ \
+  $var_docker/ \
+  /usr/libexec/docker/ \
+  /var/lib/snapd/cache/*
   clean_most || echo "Failed cleanup"
-  rm -r -f $var_docker/
-  rm -r -f /usr/libexec/docker/
-  rm -r -f /var/lib/snapd/cache/*
 }
 
 unmount() {
@@ -218,7 +224,7 @@ unmount() {
 }
 
 systemd_ctl_common() {
-  snap stop --disable docker && wait
+  snap stop --disable docker && sleep 1
   systemctl daemon-reload && wait
   systemctl reset-failed && wait
   systemctl stop snap.docker.* --all && wait
@@ -242,9 +248,9 @@ clean_all || echo "Failed cleanup"
 apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ gh+ git-lfs+ gnupg2+ \
                                                                     gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
-                                                                    scdaemon+ slirp4netns+ snapd+ systemd-container+ \
-                                                                    systemd-cryptsetup+ uidmap+ golang-docker-credential-helpers- \
-                                                                    docker- docker.io- docker-ce- docker-ce-cli- || \
+                                                                    scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
+                                                                    uidmap+ golang-github*- golang-docker*- \
+                                                                    docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
 snap install syft --classic
 snap install grype --classic
@@ -261,18 +267,13 @@ done && unset d && sleep 1 && echo
 
 systemd_ctl_common mask --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
-quiet networkctl delete docker0
-quiet networkctl delete tun0
-
-
 clean_most || echo "Failed cleanup"
-rm -f -r $docker_data/ && mkdir -p $docker_data && chown $run_as:$run_as $docker_data
 
-mkdir -p /$plugins_path && wait
+mkdir -p $docker_data /$plugins_path && chown $run_as:$run_as $docker_data
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 
-if [[ "$SKIP_LOGIN" == "" ]]; then
+if [[ "$TESTS" != *SKIP_LOGIN* ]]; then
   if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
     sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" $sc_rules
     udevadm control --reload-rules && udevadm trigger
@@ -289,12 +290,25 @@ if [[ "$SKIP_LOGIN" == "" ]]; then
   quiet $set_facl || quiet $set_facl || exit 1
 fi
 
+pushd $docker_data >> $pushd_log
+  snap version > snap.info
+  snap debug execution snap >> snap.info
+  snap debug execution apparmor >> snap.info
+  snap debug sandbox-features >> snap.info
+  save_id=$(id -u):$(id -u).env
+  set > $save_id
+  env | sort >> $save_id
+  declare >> $save_id
+  chown $run_as:$run_as $save_id snap.info
+$popd
+
 if [[ "$MOUNT" != "" ]]; then
   systemd-cryptsetup attach $module /dev/$MOUNT && sleep 1 && echo
   mount /dev/mapper/$module $docker_data && sleep 1
   rm -f -r $docker_data/* && chown $run_as:$run_as $docker_data
 fi
 if [[ "$TEST" != *no* ]]; then
+  echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log
   rootless_path=$home/rootless
   debug_cat="journalctl -o cat -t USR_RNLVL -f"
@@ -311,23 +325,11 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-pushd $docker_data >> $pushd_log
-  snap version > snap.info
-  snap debug execution snap >> snap.info
-  snap debug execution apparmor >> snap.info
-  snap debug sandbox-features >> snap.info
-  save_id=0:0.env
-  set > $save_id
-  env | sort >> $save_id
-  declare >> $save_id
-  chown $run_as:$run_as $save_id snap.info
-$popd
-
-echo 'Running as user: '$run_as' - user_id:group_id '$run_id:$run_id
+seen="$(cat <(find /sys/fs/cgroup/user.slice/user-${run_id}.slice -type d))"
+$(while [[ ! -f $rootless_path/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-${run_id}.slice/session-$(cat $rootless_path/xs.id).scope/slirp4; rm -f $rootless_path/xs.id) &
 $debug_cat &
 $systemd_cat machinectl shell $run_as@ /bin/env - /bin/bash --norc --noprofile -c "
-$debug
-cd $PWD
+$debug && cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
@@ -335,11 +337,18 @@ touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 export -- \
 ANAME='$ANAME' BRANCH='$BRANCH' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' EPOCH='$EPOCH' \
 GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$popd' \
-PUSH='$PUSH' PUSHD_LOG='$pushd_log' PUSHD_RESULTS='$pushd_results' RESULTS='$RESULTS' SKIP_LOGIN='$SKIP_LOGIN' \
-SSH_CONF='\$(<$HOME/.ssh/config)' TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' \
-|| exit 1
+PUSH='$PUSH' PUSHD_LOG='$pushd_log' PUSHD_RESULTS='$pushd_results' RESULTS='$RESULTS' SSH_CONF='\$(<$HOME/.ssh/config)' \
+TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
-eval \"\$(ssh-agent -s)\" >> $nulled && wait
+seen=\"$seen\"
+seen2=\"\$(cat \<\(find /sys/fs/cgroup/user.slice/user-${run_id}.slice -type d\))\"
+seend=\$(diff \<\(echo \$seen | tr ' ' '\n'\) \<\(echo \$seen2 | tr ' ' '\n'\) | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)
+xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
+echo \$xsid > $rootless_path/xs.id
+echo XSID=\$xsid SEEND=\$seend
+while [[ -f $rootless_path/xs.id ]]; do sleep 5; done; mkdir -p \$seend/slirp4 || exit 1
+
+eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
 
 source .identity && echo -e \"\n$PWD/.identity sourced\" || exit 1
@@ -387,7 +396,7 @@ syfted() { # \$1 = name
 }
 
 attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
-  if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
     src_att=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     read -p \"🔐 Press enter to start attestation for \$2 \$3\"
     echo -e '\nStarting Syft...\n' && touch .pager1 && tail -f .pager1 & pid1=\$!
@@ -430,7 +439,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
 }
 
 scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64 or arm64)
-  if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+  if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
     src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     if [[ \"\$3\" != \"\" ]]; then
       pushd \$3 >> $pushd_log
@@ -499,9 +508,9 @@ sys_ctl_common() {
   systemctl --user daemon-reload && wait
   systemctl --user reset-failed && wait
   systemctl --user stop docker* --all && wait
-  grep 0 <(systemctl --user list-units docker* --all --no-pager) || exit 1
+  grep 0 \<\(systemctl --user list-units docker* --all --no-pager\) || exit 1
   systemctl --user start dbus && wait
-  grep active <(systemctl --user is-active dbus) || exit 1
+  grep inactive \<\(grep active \<\(systemctl --user is-active dbus\) || exit 1\) && exit 1
 }
 
 subver() {
@@ -512,7 +521,7 @@ subver() {
 }
 
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
-  ./.pki/local.sh \$1 \$DEVICEFLOW_AUTH || exit 1
+  ./.pki/local.sh \$1 \$CLIENT_ID || exit 1
 }
 
 docker() {
@@ -531,7 +540,7 @@ confirm() { # \$1 = subject
 
 clean_some || echo \"Failed cleanup\"
 
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   gpg2 --quick-set-ownertrust \$USER_ID ultimate || exit 1
   chmod 0600 $home/\$IDENTITY_FILE && chmod 0644 $home/\$IDENTITY_FILE.pub && \
   chmod 0600 $home/\$PKI_ID_FILE && chmod 0644 $home/\$PKI_ID_FILE.pub || exit 1
@@ -549,7 +558,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
   
   echo && confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
-  if [[ ! -d ".pki" ]]; then
+  if [[ ! -d \".pki\" ]]; then
     mkdir -p .pki && git submodule add git@.pki:\$REPO/.pki.git
   else
     git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
@@ -572,7 +581,7 @@ if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
 fi
 
 source_date_epoch=1
-if [[ \"\$EPOCH\" = *today* ]]; then
+if [[ \"\$EPOCH\" == *today* ]]; then
   timestamp=\$(date -d \$(date +%D) +%s);
   if [[ \"\$timestamp\" != \"\" ]]; then
     echo \"Setting SOURCE_DATE_EPOCH from today's date: \$(date +%D) = @\$timestamp\";
@@ -616,9 +625,6 @@ cat >> $rootless_path.sh << ____EOF
 $debug && export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker
 > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
-XDG_SID=$(echo \$XDG_SESSION_ID)
-XSID=$(echo /sys/fs/cgroup/user.slice/user-$run_id.slice/session-\$XDG_SID.scope/slirp4)
-eval $(mkdir -p \$XSID) >> $nulled
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
 --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=slirp4 \
 --state-dir=$rootless_path/tmp /bin/env -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
@@ -642,6 +648,7 @@ SOURCE_DATE_EPOCH=\$sde
 SYFT_CACHE_DIR=$docker_data/syft
 TERM=$term
 XDG_CONFIG_HOME=$home
+XDG_SESSION_ID=\$xsid
 XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
 
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
@@ -689,7 +696,7 @@ $pushd_results && pushd env >> $pushd_log
   quiet '$docker buildx inspect --bootstrap >> docker.info'
 $popd && $popd
 
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
@@ -737,7 +744,7 @@ else
   subver \$sub_ver
 fi
 
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   source modules || drop_down || exit \$PIPESTATUS
 else
   drop_down || exit \$PIPESTATUS
@@ -751,7 +758,7 @@ $pushd_results
   cat readme.md && echo
 $popd
 
-if [[ \"\$SKIP_LOGIN\" == \"\" ]]; then
+if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   git status && git add -A && git status && confirm 'git commit - git@ssh'
   if [[ \"\$BRANCH\" != \"\" ]]; then
     git commit -a -S -m \"Successful Build of Release \$date_rel\" && \
