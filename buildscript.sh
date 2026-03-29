@@ -31,11 +31,9 @@ _EOF
 }
 
 test() {
-  debug="set -vx"
   nulled=/tmp/nulled.log
   pushd_log=/tmp/pushd.log
   if [[ "$RUNME" != "" ]]; then
-    chown root:root $nulled $pushd_log
     rm -f $nulled $pushd_log
     touch $nulled $pushd_log
     > $nulled; > $pushd_log
@@ -51,7 +49,7 @@ cross-compile:,\
 date:,increment:,\
 mount:,push-branch:,\
 release-tag:,tests:,help"
-SHORT="c:d:i:m:p:r:t:e:h"
+SHORT="e:c:d:i:m:p:r:t:h"
 PARSED=$(POSIXLY_CORRECT=yes $GETOPT --name "$0" -u \
 --longoptions "$LONG" --options "$SHORT" -- "$@") && \
 eval echo "$PARSED" > /dev/null || { usage; exit 2; }
@@ -77,21 +75,26 @@ if [[ "$CROSS" == "" ]]; then
   CROSS="yes"
 fi
 
+if [[ "$EPOCH" == "" ]]; then
+  EPOCH=0
+fi
+
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   debug="set -eo pipefail"
   nulled=/dev/null
   pushd_log=$nulled
   TEST="no"
 elif [[ "$TEST" != *yes* ]]; then
-  test
+  debug="set -vx"
   declare -- ${TEST}="yes"
   declare -- TESTS="${TEST}=${!TEST}"
   TEST="yes"
-else
   test
-  DEBUG="yes"
-  TESTS="DEBUG=yes"
+else
+  DEBUG="no"
+  TESTS="DEBUG=no"
   TEST="yes"
+  test
 fi
 
 $debug
@@ -122,7 +125,7 @@ if [[ "$run_id" == "" ]]; then
   fi
 fi
 
-if [[ "$TEST" != *no* ]]; then
+if [[ "$TEST" == *yes* ]]; then
   cat << __EOF
 
 Cross Compile: $CROSS
@@ -258,7 +261,7 @@ snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
 snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
 
-snap set docker nvidia-support.runtime.config-override="$(cat <(echo))" && \
+snap set docker nvidia-support.runtime.config-override="" && \
 snap set docker nvidia-support.disabled=true && \
 echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" || \
 echo "Failed to disable docker:nvidia-support"
@@ -310,18 +313,14 @@ pushd $docker_data >> $pushd_log
   chown $run_as:$run_as $save_id snap.info
 popd -- >> $pushd_log
 
-if [[ "$TEST" != *no* ]]; then
+if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log
   rootless_path=$home/rootless
-  LESSSECURE=1
-  SYSTEMD_URLIFY=false
-  SYSTEMD_LOG_LEVEL=debug
-  SYSTEMD_LOG_COLOR=false
-  SYSTEMD_LOG_LOCATION=true
-  SYSTEMD_LOG_TARGET=console
-  SYSTEMD_LOG_TIME=true
-  SYSTEMD_COLORS=false
+  SYSTEMD_LOG_LEVEL=debug; LESSSECURE=1
+  SYSTEMD_LOG_COLOR=false; SYSTEMD_COLORS=false
+  SYSTEMD_LOG_LOCATION=true; SYSTEMD_LOG_TIME=true
+  SYSTEMD_LOG_TARGET=console; SYSTEMD_URLIFY=false
   debug_cat="journalctl -o cat -t USR_RNLVL -f"
   systemd_cat="systemd-cat -t USR_RNLVL -p debug"
 else
@@ -338,7 +337,7 @@ else
 fi
 
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
-$(sleep 10; while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id) &
+$(sleep 10; while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; exit 0) &
 $($debug_cat) &
 sleep 5; $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
@@ -358,7 +357,7 @@ seend=\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep
 xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
 echo \$xsid > $docker_data/xs.id
 echo XSID=\$xsid SEEND=\$seend
-while [[ -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p \$seend/slirp4 || exit 1
+while [[ -f $docker_data/xs.id ]]; do sleep 5; done && mkdir -p \$seend/slirp4 || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -506,7 +505,7 @@ drop_down() {
   echo source .identity; echo source .pinned_ver; echo source $rootless_path/tmp/env-rootless.exp; \
   echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; echo \"echo -e '\nDropped down to interactive shell. \
   Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
-  PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'; BUILDKIT_PROGRESS=plain;\"); set -xv;
+  PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'; BUILDKIT_PROGRESS=plain;\"); $debug
 }
 
 clean_some() {
@@ -668,7 +667,7 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
 --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
-rm -f $rootless_path/env-*
+rm -f $rootless_path/env-*; exit \$PIPESTATUS
 ____EOF
 
 cp $systemd_service $sysusr_service && wait && \
@@ -676,7 +675,7 @@ sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sys
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
-sys_ctl_common && systemctl --user start docker.dockerd && sleep 5
+sys_ctl_common && systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice --all --no-pager -l > $rootless_path/docker.slice.log
 systemctl --user status docker.dockerd --all --no-pager -l > $rootless_path/docker.dockerd.log
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
@@ -735,11 +734,11 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
-if [[ \"\$CROSS\" != *no* ]]; then
+if [[ \"\$CROSS\" == *,* ]]; then
   if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then
-    docker run --privileged --cgroupns private --pull --rm $binfmt_arm64 --install amd64
+    docker run --privileged --cgroupns private --pull --rm \$binfmt_arm64 --install amd64
   elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then
-    docker run --privileged --cgroupns private --pull --rm $binfmt_amd64 --install arm64
+    docker run --privileged --cgroupns private --pull --rm \$binfmt_amd64 --install arm64
   else
     echo 'Unknown Architecture '\$(uname -m) && exit 1
   fi
@@ -755,7 +754,7 @@ else
   subver \$sub_ver
 fi
 
-if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
+if [[ \"\$TESTS\" != *SKIP_LOGIN* && \"\$DEBUG\" != *no* ]]; then
   source modules || drop_down || exit \$PIPESTATUS
 else
   drop_down || exit \$PIPESTATUS
