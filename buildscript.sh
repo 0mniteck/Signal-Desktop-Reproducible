@@ -252,8 +252,8 @@ fi
 clean_all || echo "Failed cleanup"
 
 apt-get -qq update && apt-get -qq upgrade -y && \
-apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ gh+ git-lfs+ gnupg2+ \
-                                                                    gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
+apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ fuse-overlayfs+ gh+ git-lfs+ \
+                                                                    gnupg2+ gpg-agent+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
                                                                     uidmap+ golang-github*- golang-docker*- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
