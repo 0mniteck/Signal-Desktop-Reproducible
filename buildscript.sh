@@ -258,8 +258,6 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     uidmap+ golang-github*- golang-docker*- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
-echo "options overlay metacopy=on" > /etc/modprobe.d/metacopy.conf
-modprobe -a ip_tables overlay && wait && echo "Y" | tee /sys/module/overlay/parameters/metacopy
 snap install syft --classic
 snap install grype --classic
 snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
@@ -277,6 +275,10 @@ done && unset d && sleep 1 && echo
 systemd_ctl_common mask wait --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed cleanup"
+
+echo "options overlay metacopy=on" > /etc/modprobe.d/metacopy.conf
+modprobe -a ip_tables overlay && wait && echo "Y" | tee /sys/module/overlay/parameters/metacopy
+sysctl -w kernel.unprivileged_userns_clone=1
 
 mkdir -p $docker_data /$plugins_path && chown $run_as:$run_as $docker_data
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
@@ -824,4 +826,5 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
+
 exit 0
