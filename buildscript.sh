@@ -11,7 +11,7 @@ Usage: ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cro
           [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h]
 
 Current Options: $0 $PRESERVED
-All Options:
+Available Options:
   -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
   -d, --date <date_epoch|today>    Source date epoch or today (ex. 1774468800)
   -i, --increment <.version #>     Increment version numbers (ex. .01)
@@ -28,17 +28,6 @@ Maintainers:
   - CONTACT: <shantt@duck.com>
 
 _EOF
-}
-
-test() {
-  nulled=/tmp/nulled.log
-  pushd_log=/tmp/pushd.log
-  if [[ "$RUNME" != "" ]]; then
-    rm -f $nulled $pushd_log
-    touch $nulled $pushd_log
-    > $nulled; > $pushd_log
-  fi
-  usage
 }
 
 GETOPT=$(which getopt || exit 1)
@@ -79,6 +68,17 @@ if [[ "$EPOCH" == "" ]]; then
   EPOCH=0
 fi
 
+test() {
+  nulled=/tmp/nulled.log
+  pushd_log=/tmp/pushd.log
+  if [[ "$RUNME" != "" ]]; then
+    rm -f $nulled $pushd_log
+    touch $nulled $pushd_log
+    > $nulled; > $pushd_log
+  fi
+  usage
+}
+
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   debug="set -eo pipefail"
   nulled=/dev/null
@@ -91,6 +91,7 @@ elif [[ "$TEST" != *yes* ]]; then
   TEST="yes"
   test
 else
+  unset debug
   DEBUG="no"
   TESTS="DEBUG=no"
   TEST="yes"
@@ -104,19 +105,20 @@ run_dir=/run/user/$run_id
 run_home=/home/$run_as
 term=xterm-256color
 
-rel_date=$(date -d "$(date)" +%m-%d-%Y)
+real_date=$(date +%m-%d-%Y)
 repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
 module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
 arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
 amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
-export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin TRIPL=$repo/$module:$rel_date
+export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin TRIPL=$repo/$module:$real_date
 
-if [[ "$run_id" == "" ]]; then
-  if [[ "$(whoami)" == *root* ]]; then
-    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 -e 1000 $PRESERVED'\n" && exit 1
+if [[ "${run_id}" == "" ]]; then
+  unset id; id=$(id -u)
+  if [[ "$(whoami)" == *root* || "${id}" == "0" ]]; then
+    echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1
   else
-    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 -e $(id -u) $PRESERVED'\n"
-    argv_run="exec pkexec --keep-cwd '$0' -e $(id -u) $PRESERVED"
+    echo -e "\nPkexec is required for installation steps\nUsing: ~\$ 'pkexec --keep-cwd $0 -e ${id} $PRESERVED'\n"
+    argv_run="exec pkexec --keep-cwd '$0' -e ${id} $PRESERVED"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $HOME/.casts/$repo && exec asciinema rec --overwrite -i 3 -t "$TRIPL" $HOME/.casts/$TRIPL.cast -c "$argv_run"
     else
@@ -306,7 +308,7 @@ pushd $docker_data >> $pushd_log
   snap debug execution snap >> snap.info
   snap debug execution apparmor >> snap.info
   snap debug sandbox-features >> snap.info
-  id=$(id -u)
+  unset id; id=$(id -u)
   save_id=$id:$id.env
   set > $save_id
   env | sort >> $save_id
@@ -338,7 +340,11 @@ else
 fi
 
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
-$(sleep 10 && while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done && mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4 && rm -f $docker_data/xs.id && exit 0 || exit 1) & mkpid=$!
+
+$(sleep 10 && while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done \
+&& mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-\
+$(cat $docker_data/xs.id).scope/slirp4 && rm -f $docker_data/xs.id && exit 0 || exit 1) & mkpid=$!
+
 $debug_cat & pid0=$!
 sleep 5 && $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
@@ -691,7 +697,8 @@ else
 fi
 
 \$PUSHD_RESULTS && pushd env >> $pushd_log
-  save_id=$run_id:$run_id.env
+  unset id; id=\$(id -u)
+  save_id=\$id:\$id.env
   set > \$save_id
   env | sort >> \$save_id
   declare >> \$save_id
@@ -705,7 +712,7 @@ fi
   quiet '$docker buildx version >> docker.info'
   echo -e '\nBuildx Inspect:\n' >> docker.info
   quiet '$docker buildx inspect --bootstrap >> docker.info'
-\$POPD && \$POPD
+\$POPD && \$POPD && unset save_id id
 
 if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
@@ -789,12 +796,11 @@ if [[ "$TEST" == "yes" ]]; then
   chown root:root $nulled $pushd_log
 fi
 
-kill $pid0 2>> $nulled || true
-
 if [[ "$MOUNT" != "" ]]; then
     unmount
 fi
 
+kill $pid0 2>> $nulled || true
 clean_all || echo "Failed cleanup"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 systemd_ctl_common unmask sleep\ 1
@@ -816,5 +822,4 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
-
 exit 0
