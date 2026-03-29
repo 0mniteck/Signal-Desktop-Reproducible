@@ -3,18 +3,15 @@
 
 usage() {
 cat << _EOF
-Usage: ex. $0 --mount mmcblk1p1 --increment .01 --push-branch 8.3.x --date today --cross-compile yes --test no
-Last_Inputs: $0 $PRESERVED
+
+Usage: ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no
           [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
           [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
           [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
           [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h]
-Maintainers:
-- ID: @0mniteck (Shant) <shant@omniteck.com>
-  - GPG: <10482171+0mniteck@users.noreply.github.com>
-  - COSIGN: <tiger-varsity-alto@duck.com>
-  - CONTACT: <shantt@duck.com>
-Options:
+
+Current Options: $0 $PRESERVED
+All Options:
   -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
   -d, --date <date_epoch|today>    Source date epoch or today (ex. 1774468800)
   -i, --increment <.version #>     Increment version numbers (ex. .01)
@@ -23,6 +20,13 @@ Options:
   -r, --release-tag <tag-name>     Release tag (ex. 8.44.0)
   -t, --tests <DEBUG|SKIP_LOGIN>   Skip Docker/Github login (ex. SKIP_LOGIN)
   -h, --help                       Show this usage file
+
+Maintainers:
+- ID: @0mniteck (Shant) <shant@omniteck.com>
+  - GPG: <10482171+0mniteck@users.noreply.github.com>
+  - COSIGN: <tiger-varsity-alto@duck.com>
+  - CONTACT: <shantt@duck.com>
+
 _EOF
 }
 
