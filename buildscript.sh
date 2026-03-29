@@ -304,7 +304,7 @@ pushd $docker_data >> $pushd_log
   env | sort >> $save_id
   declare >> $save_id
   chown $run_as:$run_as $save_id snap.info
-$popd
+popd -- >> $pushd_log
 
 if [[ "$TEST" != *no* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
@@ -335,8 +335,8 @@ fi
 
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
 $(sleep 10; while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done; mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id) &
-$($debug_cat) & sleep 5
-$systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
+$($debug_cat) &
+sleep 5; $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
@@ -801,7 +801,7 @@ fi
 
 snap remove syft --purge
 snap remove grype --purge
-snap remove docker --purge 2>> $nulled && wait
+snap remove docker --purge 2>> $nulled && sleep 1
 snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
 
 clean_all || echo "Failed cleanup"
