@@ -347,16 +347,22 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-$(cat << _____EOF
-while [[ ! -s $docker_data/xs.id ]]
+mk_run=$(cat << _____EOF
+while [[ ! -f $docker_data/xs.id ]]
 do
   wait
 done && unset XSID && sleep 1
-XSID=$(cat $docker_data/xs.id)
-mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$XSID.scope/slirp4
-rm -f $docker_data/xs.id
-_____EOF) & mk_pid=$!
+if [[ -f $docker_data/xs.id ]]
+then
+  XSID=$(cat <(cat $docker_data/xs.id))
+  mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$XSID.scope/slirp4
+  rm -f $docker_data/xs.id
+fi
+_____EOF
+) & mk_pid=$!
+
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
+
 $debug_cat & pid_0=$!
 $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
@@ -377,7 +383,7 @@ xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
 echo XSID=\$xsid SEEND=\$seend
 echo \$xsid > $docker_data/xs.id
 
-while [[ -s $docker_data/xs.id ]]
+while [[ -f $docker_data/xs.id ]]
 do
   wait
 done
