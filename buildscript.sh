@@ -347,20 +347,19 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-mk_run=$(cat << _____EOF
+$(cat << _____EOF
 while [[ ! -f $docker_data/xs.id ]]
 do
   wait
 done && unset XSID && sleep 1
 if [[ -f $docker_data/xs.id ]]
 then
-  XSID=$(cat <(cat $docker_data/xs.id))
-  mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$XSID.scope/slirp4
+  mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4
   rm -f $docker_data/xs.id
 fi
 _____EOF
 ) & mk_pid=$!
-
+echo $mk_pid
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
 
 $debug_cat & pid_0=$!
