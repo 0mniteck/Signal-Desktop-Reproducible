@@ -4,14 +4,19 @@
 usage() {
 cat << _EOF
 
-Usage: ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no
-          [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
+Usage:
+  SYNOPSIS
+      $0 [options]
+
+  ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no
+ Now: $0 $PRESERVED
+
+  OPTIONS [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
           [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
           [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
           [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h]
 
-Current Options: $0 $PRESERVED
-Available Options:
+All Available Options:
   -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
   -d, --date <date_epoch|today>    Source date epoch or today (ex. 1774468800)
   -i, --increment <.version #>     Increment version numbers (ex. .01)
@@ -312,11 +317,13 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 pushd $docker_data >> $pushd_log
-  snap version > snap.info
-  snap debug execution snap >> snap.info
-  snap debug execution apparmor >> snap.info
-  snap debug sandbox-features >> snap.info
-  unset id; id=$(id -u)
+  > snap.info
+  for S in {"debug "{version,{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time"}
+  do
+    echo "---------------snap-debug-$S---------------" >> snap.info
+    snap $S >> snap.info
+  done
+  unset S id; id=$(id -u)
   save_id=$id:$id.env
   set > $save_id
   env | sort >> $save_id
