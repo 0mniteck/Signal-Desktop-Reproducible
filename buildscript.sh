@@ -281,8 +281,8 @@ mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed cleanup"
 
 echo "options overlay metacopy=on" > /etc/modprobe.d/metacopy.conf
-modprobe -a ip_tables overlay && wait && echo "Y" | tee /sys/module/overlay/parameters/metacopy
-sysctl -w kernel.unprivileged_userns_clone=1
+modprobe -a ip_tables overlay && wait && quiet 'echo "Y" | tee /sys/module/overlay/parameters/metacopy'
+quiet 'sysctl -w kernel.unprivileged_userns_clone=1'
 
 mkdir -p $docker_data /$plugins_path && chown $run_as:$run_as $docker_data
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
