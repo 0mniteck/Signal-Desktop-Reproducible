@@ -222,9 +222,9 @@ clean_all() {
 unmount() {
   quiet snap stop --disable docker && sleep 1
   if [[ -d $docker_data ]]; then
-    lsofd=$(echo $(lsof -F p $docker_data 2>> $nulled || true) | cut -d'p' -f2)
-    if [[ "$lsofd" -gt 0 ]]; then
-      quiet kill $lsofd && rm -r -f $docker_data/* && sync
+    lsof_d="$(cat <(lsof -F p $docker_data 2>> $nulled | cut -d'p' -f2 || true))"
+    if [[ "$lsof_d" -gt 0 ]]; then
+      quiet kill $lsof_d && rm -r -f $docker_data/* && sync
     fi
   fi
   quiet umount $docker_data && sleep 1
@@ -347,14 +347,18 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
+$(cat << _____EOF
+while [[ ! -s $docker_data/xs.id ]]
+do
+  wait
+done && unset XSID && sleep 1
+XSID=$(cat $docker_data/xs.id)
+mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$XSID.scope/slirp4
+rm -f $docker_data/xs.id
+_____EOF) & mk_pid=$!
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
-
-$(sleep 10 && while [[ ! -f $docker_data/xs.id ]]; do sleep 5; done \
-&& mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-\
-$(cat $docker_data/xs.id).scope/slirp4 && rm -f $docker_data/xs.id && exit 0 || exit 1) & mkpid=$!
-
-$debug_cat & pid0=$!
-sleep 5 && $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
+$debug_cat & pid_0=$!
+$systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
 
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
@@ -370,9 +374,20 @@ seen1=\"$seen\"
 seen2=\"\$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))\"
 seend=\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)
 xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
-echo \$xsid > $docker_data/xs.id
 echo XSID=\$xsid SEEND=\$seend
-while [[ -f $docker_data/xs.id ]]; do sleep 5; done && kill $mkpid 2>> $nulled | true && mkdir -p \$seend/slirp4 || exit 1
+echo \$xsid > $docker_data/xs.id
+
+while [[ -s $docker_data/xs.id ]]
+do
+  wait
+done
+
+while [[ \$(cat <(lsof -p $mk_pid -R | grep $mk_pid)) == *$mk_pid* ]]
+do
+  printf '%s'\\r 'mk_pid still running...'
+  sleep 0.1
+done
+mkdir -p \$seend/slirp4 && echo 'XDG_SESSION: Directory created' || echo 'SEENd Failed'
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -425,11 +440,11 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
   if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
     src_att=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     read -p \"🔐 Press enter to start attestation for \$2 \$3\"
-    echo -e '\nStarting Syft...\n' && touch .pager1 && tail -f .pager1 & pid1=\$!
+    echo -e '\nStarting Syft...\n' && touch .pager1 && tail -f .pager1 & pid_1=\$!
     syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest --output spdx-json docker.io/\$2 \
     \$3 \$src_att' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
-    kill \$pid1 2>> $nulled | true && rm -f .pager1 && echo || exit 1
+    kill \$pid_1 2>> $nulled | true && rm -f .pager1 && echo || exit 1
     
     sleep 5 && echo docker.io/\$2@\$(cat \$1.image.id) > \$1.index.ref
     docker buildx imagetools inspect --format {{ json .Provenance.SLSA }} \$(cat \$1.index.ref) > \$1.provenance.json
@@ -477,18 +492,18 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
       R=\"\$1\"
     fi
     echo -e '\nStarting Syft...\n'
-    touch \$1.syft.tmp && tail -f \$1.syft.tmp & pid2=\$!
+    touch \$1.syft.tmp && tail -f \$1.syft.tmp & pid_2=\$!
     syft_run=\"script -q -c 'TMPDIR=$docker_data/syft syft scan \$2 \$src \$arch -o spdx-json=\$1.spdx.json' /dev/null > \$1.syft.tmp\"
     quiet \$syft_run || quiet \$syft_run || exit 1
-    kill \$pid2 2>> $nulled | true && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
+    kill \$pid_2 2>> $nulled | true && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
     echo \$R' - Syft Scan Results - '\$(syft --version) > \$1.contents
   	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
     
     echo -e 'Starting Grype...\n' && grype config > $docker_data/.grype.yaml
-    touch \$1.grype.tmp && tail -f \$1.grype.tmp & pid3=\$!
+    touch \$1.grype.tmp && tail -f \$1.grype.tmp & pid_3=\$!
     script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
     -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
-    kill \$pid3 2>> $nulled | true && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
+    kill \$pid_3 2>> $nulled | true && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
   	echo \$R' - Grype Scan Results - '\$(grype --version) > \$1.vulns
   	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
   \$POPD
@@ -796,6 +811,17 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   fi
 fi
 
+pids=\"\$pid_1 \$pid_2 \$pid_3\"
+for P in \$pids
+do
+  while [[ \"\$P\" -gt 0 && \$(cat <(lsof -p \$P -R | grep \$P)) == *\$P* ]]
+  do
+    printf '%s'\\r \$P': still running...'
+    quiet kill \$P && echo \"Killed pid: \$P\"
+    sleep 1
+  done
+done && unset P pids pid_1 pid_2 pid_3
+
 docker-credential-pass erase &
 ssh-add -D && eval \$(ssh-agent -k)
 clean_some && sys_ctl_common"
@@ -808,17 +834,24 @@ if [[ "$MOUNT" != "" ]]; then
     unmount
 fi
 
-kill $pid0 2>> $nulled || true
+if [[ -d $home/$snap_path ]]; then
+  dir_pid="$(cat <(lsof -F p $home/$snap_path 2>> $nulled | cut -d'p' -f2 || true))"
+fi
+
+pids="$pid_0 $mk_pid $dir_pid $lsof_d"
+for P in $pids
+do
+  while [[ "$P" -gt 0 && $(cat <(lsof -p $P -R | grep $P)) == *$P* ]]
+  do
+    printf '%s'\\r $P': still running...'
+    quiet kill $P && echo "Killed pid: $P"
+    sleep 1
+  done
+done && unset pids pid_0 mk_pid dir_pid lsof_d
+
 clean_all || echo "Failed cleanup"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 systemd_ctl_common unmask sleep\ 1
-
-if [[ -d $home/$snap_path ]]; then
-  lsofd2=$(echo $(lsof -F p $home/$snap_path 2>> $nulled || true) | cut -d'p' -f2)
-  if [[ "$lsofd2" -gt 0 ]]; then
-    quiet kill $lsofd2 && rm -r -f $home/$snap_path/* && sync
-  fi
-fi
 
 snap remove syft --purge
 snap remove grype --purge
@@ -830,5 +863,4 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
-
 exit 0
