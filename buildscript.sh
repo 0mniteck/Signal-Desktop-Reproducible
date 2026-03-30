@@ -182,7 +182,9 @@ sed_ech=$(cat << ___EOF
 Type=exec\\
 Group=$run_as\\
 ExitType=cgroup\\
+AllowIsolate=true\\
 Slice=docker.slice\\
+ConditionUser=$run_id\\
 Delegate=cpu\\ cpuset\\ io\\ memory\\ pids\\
 ___EOF
 )
