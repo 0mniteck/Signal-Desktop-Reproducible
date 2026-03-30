@@ -178,13 +178,15 @@ docker=$docker_path/docker
 dockerd=${docker}d
 
 sed_ech=$(cat << ___EOF
+Conflicts=snap.docker.dockerd\\
+AssertUser=$run_id\\
+AssertGroup=$run_id\\
+AllowIsolate=true\\
 \\\\[Service\\\\]\\
 Type=exec\\
 Group=$run_as\\
 ExitType=cgroup\\
-AllowIsolate=true\\
 Slice=docker.slice\\
-ConditionUser=$run_id\\
 Delegate=cpu\\ cpuset\\ io\\ memory\\ pids\\
 ___EOF
 )
