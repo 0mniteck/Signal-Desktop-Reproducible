@@ -23,10 +23,5 @@ declare -- moby_repo=docker.io/moby/buildkit
 declare -- moby_tag=v0.28.1
 declare -- moby_src=sha256:a82d1ab899cda51aade6fe818d71e4b58c4079e047a0cf29dbb93b2b0465ea69
 declare -- moby=$moby_repo:$moby_tag@$moby_src
-declare -- cohort={"cohorts":{\
-"docker":{"cohort-key":\
-"MSBzTENzRkFPOFBLTTVaMGZBS05zelVPWDBZQVNqUWZlWiAxNzc0ODk1MTM3IDJkYmE3YTcxMjhhZDk4OGE3YTQxNjJlMzAwOTk5YzYwOWYzY2M5MzQ2M2FlNDMwM2UzYTkzZjkwN2ZlYmNmYzI="},\
-"grype":{"cohort-key":\
-"MSB6RXlLcERiMG5oRUVQajJndjNuNDNjcTRKMlRxbnlRTCAxNzc0ODk1MTM3IGQyMWRjY2IyNzU0ODA1YjA0YjA5ZGZmOTY5YzBmZTAxNmZjZmEwYmNmYWE4MWM2NDVjNTQ1OGE0OTJlOGM1YmU="},\
-"syft":{"cohort-key":\
-"MSBUSUxXMWpoc3VqOTQyUHpwbk1MR2tGUEIzVFQ2YkdsaiAxNzc0ODk1MTM3IDZjZDFkZTk0NDc2MGIxMzBlNDhiMWNjZWE3Mzk3ZGVkMTM5NTAzNWE0Y2U1NTkwMzE1ZTQ2M2Y0MGE0MGQ2MTg="}}}
+# snap installation cohorts - 90 day auto pinning cycle (3/31/2026) v28.4 - (6/30/2026)
+{"cohorts":{"docker":{"cohort-key":"MSBzTENzRkFPOFBLTTVaMGZBS05zelVPWDBZQVNqUWZlWiAxNzc0ODk1MTM3IDJkYmE3YTcxMjhhZDk4OGE3YTQxNjJlMzAwOTk5YzYwOWYzY2M5MzQ2M2FlNDMwM2UzYTkzZjkwN2ZlYmNmYzI="},"grype":{"cohort-key":"MSB6RXlLcERiMG5oRUVQajJndjNuNDNjcTRKMlRxbnlRTCAxNzc0ODk1MTM3IGQyMWRjY2IyNzU0ODA1YjA0YjA5ZGZmOTY5YzBmZTAxNmZjZmEwYmNmYWE4MWM2NDVjNTQ1OGE0OTJlOGM1YmU="},"syft":{"cohort-key":"MSBUSUxXMWpoc3VqOTQyUHpwbk1MR2tGUEIzVFQ2YkdsaiAxNzc0ODk1MTM3IDZjZDFkZTk0NDc2MGIxMzBlNDhiMWNjZWE3Mzk3ZGVkMTM5NTAzNWE0Y2U1NTkwMzE1ZTQ2M2Y0MGE0MGQ2MTg="}}}
