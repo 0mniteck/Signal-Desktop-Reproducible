@@ -4,19 +4,20 @@
 usage() {
 cat << _EOF
 
-Usage:
-  SYNOPSIS
+General Usage:
+  Requirements: 1. Ubuntu 24,04.4+ (arm64 or amd64)
+                2. .dotfiles (./.pinned_ver and ./.identity)
+  Synopsis:
       $0 [options]
-
-  ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no
+  ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no -- <COMMIT MESSAGE+DESCRIPTION>
  Now: $0 $PRESERVED
 
-  OPTIONS [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
-          [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
-          [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
-          [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h]
+  Options: [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
+           [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
+           [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
+           [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h] , [-- <commit message>]
 
-All Available Options:
+  All Options:
   -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
   -d, --date <date_epoch|today>    Source date epoch or today (ex. 1774468800)
   -i, --increment <.version #>     Increment version numbers (ex. .01)
@@ -25,6 +26,7 @@ All Available Options:
   -r, --release-tag <tag-name>     Release tag (ex. 8.44.0)
   -t, --tests <DEBUG|SKIP_LOGIN>   Skip Docker/Github login (ex. SKIP_LOGIN)
   -h, --help                       Show this usage file
+  -,  --     <commit+message>      Commit message and description (ex. "8.x Success!")
 
 Maintainers:
 - ID: @0mniteck (Shant) <shant@omniteck.com>
@@ -60,7 +62,7 @@ while [[ "$1" != "" ]]; do
     -t|--tests)           TEST="$2";  shift 2 ;;
     -e|--runme)          RUNME="$2";  shift 2 ;;
     -h|--help)                usage;   exit 0 ;;
-     -|--)                              shift ;;
+     -|--)              COMMIT="$@"; continue ;;
      *|**)     echo $ERR >&2; usage;   exit 3 ;;
   esac
 done
@@ -111,11 +113,18 @@ run_home=/home/$run_as
 term=xterm-256color
 
 real_date=$(date +%m-%d-%Y)
-repo=$(cat .identity | grep REPO= | cut -d'=' -f2)
-module=$(cat .identity | grep MODULE= | cut -d'=' -f2)
-arm64_ver=$(cat .pinned_ver | grep arm64_ver= | cut -d'=' -f2)
-amd64_ver=$(cat .pinned_ver | grep amd64_ver= | cut -d'=' -f2)
-export -- HOME=$run_home TERM=$term PATH=/bin:/sbin:/snap/bin TRIPL=$repo/$module:$real_date
+repo=$(grep REPO= .identity | cut -d'=' -f2)
+module=$(grep MODULE= .identity | cut -d'=' -f2)
+arm64_ver=$(grep arm64_ver= .pinned_ver | cut -d'=' -f2)
+amd64_ver=$(grep amd64_ver= .pinned_ver | cut -d'=' -f2)
+
+cohorts=$(sed -n '/{"coh/,/"}}}/p' .pinned_ver | jq -c .[])
+ch_docker=$(echo $cohorts | jq -r .docker[])
+ch_syft=$(echo $cohorts | jq -r .syft[])
+ch_grype=$(echo $cohorts | jq -r .grype[])
+export -- HOME=$run_home \
+TERM=$term PATH=/bin:/sbin:/snap/bin \
+TRIPL=$repo/$module:$real_date
 unset id; id=$(id -u)
   
 if [[ "${run_id}" == "" ]]; then
@@ -133,14 +142,15 @@ if [[ "${run_id}" == "" ]]; then
 fi
 
 if [[ "$TEST" == *yes* ]]; then
-  cat << __EOF
+cat << __EOF
 
-Cross Compile: $CROSS
-Increment: $INC
-Override Source Epoch: $EPOCH
-Mount: /dev/$MOUNT
-Push to Branch: $BRANCH
 Tag Release: $TAG
+Push to Branch: $BRANCH
+Commit Message: $COMMIT
+Cross Compile: $CROSS
+Override Date: $EPOCH
+Increment: $INC
+Mount: /dev/$MOUNT
 Run Tests: TEST=$TEST - TESTS=$TESTS - $TESTS
 Run Level: $RUNME
 
@@ -168,6 +178,8 @@ local_bin=$home/docker/bin
 local_lib=$home/docker/lib
 data_dir=$local_data/share
 rootless_path=$data_dir/rootless
+apparmor_path=/etc/apparmor.d
+apparmor_profile=$apparmor_path/re-snapped.rootless.docker
 sc_rules=/lib/udev/rules.d/60-scdaemon.rules
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
@@ -238,8 +250,9 @@ unmount() {
   rm -r -f $docker_data/ && sync
 }
 
-systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep, $3 = --now
-  snap stop --disable docker && $2
+systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
+  snap stop --disable docker.dockerd && $2
+  snap stop --disable docker.nvidia-container-toolkit && $2
   systemctl daemon-reload && $2
   systemctl reset-failed && $2
   systemctl stop snap.docker.* --all && $2
@@ -248,6 +261,11 @@ systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep, $3 = --now
   quiet networkctl delete docker0
   quiet networkctl delete tun0
 }
+
+# apparm() { # $1 = [-a/-r] [--add/--replace]
+#   rm -f $apparmor_profile;
+#   cp $apparmor_path/usr.lib.snapd.snap-confine.* $apparmor_profile
+#   apparmor_parser $1 -K --abort-on-error --namespace-string docker $apparmor_profile }
 
 quiet() {
   echt="$@"
@@ -267,9 +285,12 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     uidmap+ golang-github*- golang-docker*- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
+# snap watch $(snap install syft grype --no-wait --classic transaction=all-snaps --cohort=$() --cohort=$)
+# snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$())
+
 snap install syft --classic
 snap install grype --classic
-snap remove docker --purge 2>> $nulled && wait || echo "Failed to remove Docker"
+snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker"
 snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
 
 snap set docker nvidia-support.runtime.config-override="" && \
@@ -278,13 +299,14 @@ echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" 
 echo "Failed to disable docker:nvidia-support"
 
 for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
-  snap disconnect docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
+  snap disconnect --forget docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
 done && unset d && sleep 1 && echo
 
 systemd_ctl_common mask wait --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed cleanup"
 
+# if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
 echo "options overlay metacopy=on" > /etc/modprobe.d/metacopy.conf
 modprobe -a ip_tables overlay && wait && quiet 'echo "Y" | tee /sys/module/overlay/parameters/metacopy'
 quiet 'sysctl -w kernel.unprivileged_userns_clone=1'
@@ -318,7 +340,8 @@ fi
 
 pushd $docker_data >> $pushd_log
   > snap.info
-  for S in {"debug "{version,{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time"}
+  for S in {"debug "{version,{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},\
+  "changes --abs-time","refresh --time"}
   do
     echo "---------------snap-debug-$S---------------" >> snap.info
     snap $S >> snap.info
@@ -448,12 +471,12 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     \$3 \$src_att' /dev/null > .pager1\"
     quiet \$syft_att_run || quiet \$syft_att_run || exit 1
     quiet kill \$pid_1 && rm -f .pager1 && echo || exit 1
-    
+
     sleep 5 && echo docker.io/\$2@\$(cat \$1.image.id) > \$1.index.ref
     docker buildx imagetools inspect --format {{ json .Provenance.SLSA }} \$(cat \$1.index.ref) > \$1.provenance.json
     docker buildx imagetools inspect --format {{ .Manifest }} \$(cat \$1.index.ref) > \$1.manifest.md
     jsin=\$(docker buildx imagetools inspect --format {{ json . }} \$(cat \$1.index.ref))
-    
+
     digest1=\$(echo \$jsin | jq .manifest.manifests.[0].digest | cut -d'\"' -f2)
     arr1=\$(echo \$jsin | jq .manifest.manifests.[0].platform.architecture | cut -d'\"' -f2)
     att1=\$(echo \$(echo \$jsin | jq .manifest.manifests.[2].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
@@ -467,7 +490,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     if [[ \"\$digest2\" == \"\$att2\" ]]; then
       echo docker.io/\$2@\$digest2 > \$arr2/\$1.manifest.ref
     fi
-    
+
     for arr in \$arr1 \$arr2; do
       echo 'Starting Cosign...' && pushd \$arr >> $pushd_log
       cosign_run=\"script -q -c 'cosign verify-attestation \$(cat \$1.manifest.ref) \
@@ -500,15 +523,15 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
     quiet \$syft_run || quiet \$syft_run || exit 1
     quiet kill \$pid_2 && rm -f -r $docker_data/syft/* && echo && syfted \$1 || exit 1
     echo \$R' - Syft Scan Results - '\$(syft --version) > \$1.contents
-  	cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
-    
+    cat \$1.syft.status >> \$1.contents && rm -f \$1.syft.status
+
     echo -e 'Starting Grype...\n' && grype config > $docker_data/.grype.yaml
     touch \$1.grype.tmp && tail -f \$1.grype.tmp & pid_3=\$!
     script -q -c \"TMPDIR=$docker_data/grype grype sbom:\$1.spdx.json \
     -c $docker_data/.grype.yaml \$arch -o json --file \$1.grype.json\" /dev/null > \$1.grype.tmp
     quiet kill \$pid_3 && rm -f -r $docker_data/grype/* && echo && gryped \$1 || exit 1
-  	echo \$R' - Grype Scan Results - '\$(grype --version) > \$1.vulns
-  	cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
+    echo \$R' - Grype Scan Results - '\$(grype --version) > \$1.vulns
+    cat \$1.grype.status >> \$1.vulns && rm -f \$1.grype.status
   \$POPD
   else
     echo 'Skipping Syft and Grype: Docker Hub: not logged in...'
@@ -805,7 +828,7 @@ fi
 if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   git status && git add -A && git status && confirm 'git commit - git@ssh'
   if [[ \"\$BRANCH\" != \"\" ]]; then
-    git commit -a -S -m \"Successful Build of Release \$date_rel\" && \
+    git commit -a -S -m \"$COMMIT \$date_rel\" && \
     git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
     if [[ \"\$TAG\" != \"\" ]]; then
       git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && \
@@ -856,10 +879,10 @@ clean_all || echo "Failed cleanup"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
 systemd_ctl_common unmask sleep\ 1
 
-snap remove syft --purge
-snap remove grype --purge
-snap remove docker --purge 2>> $nulled && sleep 1
-snap remove docker --purge 2>> $nulled || echo "Failed to remove Docker"
+snap remove syft --purge --terminate
+snap remove grype --purge --terminate
+snap remove docker --purge --terminate 2>> $nulled && sleep 1
+snap remove docker --purge --terminate 2>> $nulled || echo "Failed to remove Docker"
 
 clean_all || echo "Failed cleanup"
 
