@@ -283,16 +283,11 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     gnupg2+ gpg-agent+ iptables+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
                                                                     uidmap+ golang-github*- golang-docker*- \
-                                                                    docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
-                                                                    echo "Failed apt install"
-# snap watch $(snap install syft grype --no-wait --classic transaction=all-snaps --cohort=$() --cohort=$)
-# snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$())
-
-snap install syft --classic
-snap install grype --classic
-snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker"
-snap install docker --revision=$docker_snap_ver || echo "Failed to install Docker"
-
+                                                                    docker- docker.io- docker-ce- docker-ce-cli- podman*- || echo "Failed apt install"
+snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
+snap watch $(snap install syft grype --no-wait --classic transaction=all-snaps --cohort=ch_syft --cohort=$ch_grype )
+snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$ch_docker }
+# --revision=$docker_snap_ver
 snap set docker nvidia-support.runtime.config-override="" && \
 snap set docker nvidia-support.disabled=true && \
 echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" || \
@@ -339,13 +334,19 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 pushd $docker_data >> $pushd_log
-  > snap.info
+  > snap.{info,events}
   for S in {"debug "{version,{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},\
   "changes --abs-time","refresh --time"}
   do
     echo "---------------snap-debug-$S---------------" >> snap.info
     snap $S >> snap.info
+  done && unset S
+  for S in echo $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ')
+  do snap debug state --change=$S /var/lib/snapd/state.json >> snap.events
+  snap debug state --task=$S /var/lib/snapd/state.json >> snap.events
+  do snap debug timings >> snap.events
   done
+  
   unset S id; id=$(id -u)
   save_id=$id:$id.env
   set > $save_id
