@@ -287,7 +287,7 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     echo "Failed apt install"
 
 snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
-snap watch $(snap install syft grype --no-wait transaction=all-snaps --cohort=ch_syft --cohort=$ch_grype )
+snap watch $(snap install syft grype --no-wait transaction=syft,grype --cohort=ch_syft --cohort=$ch_grype )
 snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$ch_docker)
 # --revision=$docker_snap_ver
 
