@@ -283,11 +283,14 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     gnupg2+ gpg-agent+ iptables+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
                                                                     uidmap+ golang-github*- golang-docker*- \
-                                                                    docker- docker.io- docker-ce- docker-ce-cli- podman*- || echo "Failed apt install"
+                                                                    docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
+                                                                    echo "Failed apt install"
+
 snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
-snap watch $(snap install syft grype --no-wait --classic transaction=all-snaps --cohort=ch_syft --cohort=$ch_grype )
-snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$ch_docker }
+snap watch $(snap install syft grype --no-wait transaction=all-snaps --cohort=ch_syft --cohort=$ch_grype )
+snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$ch_docker)
 # --revision=$docker_snap_ver
+
 snap set docker nvidia-support.runtime.config-override="" && \
 snap set docker nvidia-support.disabled=true && \
 echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" || \
