@@ -286,10 +286,17 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
 
+if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required" exit 1; fi;
 snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
-snap watch $(snap install syft --no-wait --classic --cohort=$ch_syft )
-snap watch $(snap install grype --no-wait --classic --cohort=$ch_grype )
-snap watch $(snap install docker --no-wait --name=docker_rootless --jailmode --unaliased --cohort=$ch_docker)
+ch_id_syft=$(snap install syft --no-wait --classic --cohort=$ch_syft )
+snap watch $ch_id_syft
+snap tasks $ch_id_syft --abs-time
+ch_id_grype=$(snap install grype --no-wait --classic --cohort=$ch_grype )
+snap watch $ch_id_grype
+snap tasks $ch_id_grype --abs-time
+ch_id_docker=$(snap install docker --no-wait --jailmode --unaliased --cohort=$ch_docker )
+snap watch $ch_id_docker
+snap tasks $ch_id_docker --abs-time
 # --revision=$docker_snap_ver
 
 snap set docker nvidia-support.runtime.config-override="" && \
