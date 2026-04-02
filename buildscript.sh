@@ -349,7 +349,7 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 pushd $docker_data >> $pushd_log
-  > snap.{info,events}
+  > snap.info; > snap.events
   for S in {"debug "{version,{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},\
   "changes --abs-time","refresh --time"}
   do
