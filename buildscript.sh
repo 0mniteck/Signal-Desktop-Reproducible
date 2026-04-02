@@ -290,18 +290,25 @@ if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict con
 snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
 
 ch_id_syft=$(snap install syft --no-wait --classic --cohort=$ch_syft )
-snap watch $ch_id_syft
-snap debug timings $ch_id_syft
+if [[ "$ch_id_syft" -gt 0 ]]; then
+  snap watch $ch_id_syft
+  snap debug timings $ch_id_syft
+fi
+
 ch_id_grype=$(snap install grype --no-wait --classic --cohort=$ch_grype )
-snap watch $ch_id_grype
-snap debug timings $ch_id_grype
+if [[ "$ch_id_grype" -gt 0 ]]; then
+  snap watch $ch_id_grype
+  snap debug timings $ch_id_grype
+fi
 
 snap set system experimental.parallel-instances=true
 snap download --basename=docker_rootless docker --cohort=$ch_docker
 snap ack docker_rootless.assert || exit 1
 ch_id_docker=$(snap install docker_rootless.snap --name=docker_rootless --no-wait --jailmode --unaliased )
-snap watch $ch_id_docker
-snap debug timings $ch_id_docker
+if [[ "$ch_id_docker" -gt 0 ]]; then
+  snap watch $ch_id_docker
+  snap debug timings $ch_id_docker
+fi
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && \
