@@ -372,7 +372,7 @@ pushd $docker_data >> $pushd_log
     echo '--------------------tasks-id-------------------' >> snap.events
     snap tasks $S --abs-time
     echo '------------debug-state-timings-id-------------' >> snap.events
-    snap debug timings $S --abs-time >> snap.events
+    snap debug timings $S >> snap.events
   done && unset S
 
   unset S id; id=$(id -u)
