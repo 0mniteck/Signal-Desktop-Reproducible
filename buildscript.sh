@@ -298,7 +298,7 @@ snap debug timings $ch_id_grype
 
 snap download --basename=docker_rootless docker --cohort=$ch_docker 
 snap ack docker_rootless.assert
-ch_id_docker=$(snap install docker_rootless.snap --name=docker_${docker_snap_ver}_rootless --no-wait --jailmode --unaliased )
+ch_id_docker=$(snap install docker_rootless.snap --name=docker_rootless --no-wait --jailmode --unaliased )
 # rm *.assert *.snap
 snap watch $ch_id_docker
 snap debug timings $ch_id_docker
