@@ -187,7 +187,7 @@ systemd_path=/etc/systemd/system
 systemd_service=$systemd_path/snap.docker.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
 var_docker=/var/snap/docker
-snap_path=snap/docker/$docker_snap_ver
+snap_path=snap/docker_rootless/$docker_snap_ver
 docker_plugins=/$plugins_path/docker-
 docker_data=$data_dir/docker
 docker_path=/$snap_path/bin
@@ -296,21 +296,20 @@ ch_id_grype=$(snap install grype --no-wait --classic --cohort=$ch_grype )
 snap watch $ch_id_grype
 snap debug timings $ch_id_grype
 
-snap download --basename=docker_rootless docker --cohort=$ch_docker 
-snap ack docker_rootless.assert
+snap set system experimental.parallel-instances=true
+snap download --basename=docker_rootless docker --cohort=$ch_docker
+snap ack docker_rootless.assert || exit 1
 ch_id_docker=$(snap install docker_rootless.snap --name=docker_rootless --no-wait --jailmode --unaliased )
-# rm *.assert *.snap
 snap watch $ch_id_docker
 snap debug timings $ch_id_docker
-read -p TEST
 
-snap set docker nvidia-support.runtime.config-override="" && \
-snap set docker nvidia-support.disabled=true && \
-echo -e "\nRemoving feature docker:nvidia-support\nRemoving feature docker:cdi" || \
-echo "Failed to disable docker:nvidia-support"
+snap set docker_rootless nvidia-support.runtime.config-override="" && \
+snap set docker_rootless nvidia-support.disabled=true && \
+echo -e "\nRemoving feature docker_rootless:nvidia-support\nRemoving feature docker_rootless:cdi" || \
+echo "Failed to disable docker_rootless:nvidia-support"
 
 for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
-  snap disconnect --forget docker:$d >> $nulled && echo "Removing plug docker:"$d || exit 1
+  snap disconnect --forget docker_rootless:$d >> $nulled && echo "Removing plug docker_rootless:"$d || exit 1
 done && unset d && sleep 1 && echo
 
 systemd_ctl_common mask wait --now
@@ -357,6 +356,7 @@ pushd $docker_data >> $pushd_log
     echo "---------------snap-debug-$S---------------" >> snap.info
     snap $S >> snap.info
   done && unset S
+  
   for S in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
   do
     echo '-------------debug-state-change-id-------------' >> snap.events
@@ -807,7 +807,7 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   echo Installed at: $local_lib/$uname-$OSTYPE/libassuan.so.9 || exit 1
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
-  snap run --shell docker.docker -c 'PATH=\$PATH:$local_bin ; \
+  snap run --shell docker_rootless.docker -c 'PATH=\$PATH:$local_bin ; \
   LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-$OSTYPE ; docker login' || exit 1
   mv -T $home/$snap_path/.password-store $home/.password-store || exit 1
   mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
@@ -904,8 +904,8 @@ systemd_ctl_common unmask sleep\ 1
 
 snap remove syft --purge --terminate
 snap remove grype --purge --terminate
-snap remove docker --purge --terminate 2>> $nulled && sleep 1
-snap remove docker --purge --terminate 2>> $nulled || echo "Failed to remove Docker"
+snap remove docker_rootless --purge --terminate 2>> $nulled && sleep 1
+snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker"
 
 clean_all || echo "Failed cleanup"
 
