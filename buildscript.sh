@@ -360,19 +360,19 @@ pushd $docker_data >> $pushd_log
   for S in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
   do
     echo "---------------snap-debug-$S---------------" >> snap.info
-    snap $S >> snap.info
+    quiet "snap $S >> snap.info"
   done && unset S
   
   for S in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
   do
     echo '-------------debug-state-change-id-------------' >> snap.events
-    snap debug state --abs-time --change=$S /var/lib/snapd/state.json >> snap.events
+    quiet "snap debug state --abs-time --change=$S /var/lib/snapd/state.json >> snap.events"
     echo '--------------debug-state-tasks-id-------------' >> snap.events
-    snap debug state --abs-time --task=$S /var/lib/snapd/state.json >> snap.events
+    quiet "snap debug state --abs-time --task=$S /var/lib/snapd/state.json >> snap.events"
     echo '--------------------tasks-id-------------------' >> snap.events
-    snap tasks $S --abs-time
+    quiet "snap tasks $S --abs-time"
     echo '------------debug-state-timings-id-------------' >> snap.events
-    snap debug timings $S >> snap.events
+    quiet "snap debug timings $S >> snap.events"
   done && unset S
 
   unset S id; id=$(id -u)
