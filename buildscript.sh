@@ -288,16 +288,21 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
 
 if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required" exit 1; fi;
 snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
+
 ch_id_syft=$(snap install syft --no-wait --classic --cohort=$ch_syft )
 snap watch $ch_id_syft
-snap tasks $ch_id_syft --abs-time
+snap debug timings $ch_id_syft
 ch_id_grype=$(snap install grype --no-wait --classic --cohort=$ch_grype )
 snap watch $ch_id_grype
-snap tasks $ch_id_grype --abs-time
-ch_id_docker=$(snap install docker --no-wait --jailmode --unaliased --cohort=$ch_docker )
+snap debug timings $ch_id_grype
+
+snap download --basename=docker_rootless docker --cohort=$ch_docker 
+snap ack docker_rootless.assert
+ch_id_docker=$(snap install docker_rootless.snap --name=docker\ rootless --no-wait --jailmode --unaliased )
+# rm *.assert *.snap
 snap watch $ch_id_docker
-snap tasks $ch_id_docker --abs-time
-# --revision=$docker_snap_ver
+snap debug timings $ch_id_docker
+read -p TEST
 
 snap set docker nvidia-support.runtime.config-override="" && \
 snap set docker nvidia-support.disabled=true && \
@@ -352,18 +357,24 @@ pushd $docker_data >> $pushd_log
     echo "---------------snap-debug-$S---------------" >> snap.info
     snap $S >> snap.info
   done && unset S
-  for S in echo $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ')
-  do snap debug state --change=$S /var/lib/snapd/state.json >> snap.events
-  snap debug state --task=$S /var/lib/snapd/state.json >> snap.events
-  do snap debug timings >> snap.events
-  done
-  
+  for S in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
+  do
+    echo '-------------debug-state-change-id-------------' >> snap.events
+    snap debug state --abs-time --change=$S /var/lib/snapd/state.json >> snap.events
+    echo '--------------debug-state-tasks-id-------------' >> snap.events
+    snap debug state --abs-time --task=$S /var/lib/snapd/state.json >> snap.events
+    echo '--------------------tasks-id-------------------' >> snap.events
+    snap tasks $S --abs-time
+    echo '------------debug-state-timings-id-------------' >> snap.events
+    snap debug timings $S --abs-time >> snap.events
+  done && unset S
+
   unset S id; id=$(id -u)
   save_id=$id:$id.env
   set > $save_id
   env | sort >> $save_id
   declare >> $save_id
-  chown $run_as:$run_as $save_id snap.info
+  chown $run_as:$run_as $save_id snap.{info,events}
 popd -- >> $pushd_log && unset save_id id
 
 if [[ "$TEST" == *yes* ]]; then
@@ -763,7 +774,7 @@ fi
   set > \$save_id
   env | sort >> \$save_id
   declare >> \$save_id
-  mv $docker_data/{0:0.env,snap.info} .
+  mv $docker_data/{0:0.env,snap.{info,events}} .
   cp $rootless_path/env-docker docker.env
   echo -e '\nDocker Version:\n' > docker.info
   quiet '$docker version >> docker.info'
