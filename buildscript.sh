@@ -251,8 +251,8 @@ unmount() {
 }
 
 systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
-  snap stop --disable docker.dockerd && $2
-  snap stop --disable docker.nvidia-container-toolkit && $2
+  snap stop --disable docker_rootless.dockerd && $2
+  snap stop --disable docker_rootless.nvidia-container-toolkit && $2
   systemctl daemon-reload && $2
   systemctl reset-failed && $2
   systemctl stop snap.docker.* --all && $2
