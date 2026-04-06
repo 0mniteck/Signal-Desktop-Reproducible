@@ -272,11 +272,15 @@ snap_install() {
   if [[ "$ch_id" -gt 0 ]]; then
     snap watch $ch_id
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
-    if [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then wait; else exit 1; fi;
+    if [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
+      echo "$1 v$(snap list $(echo $1 | cut -d'.' -f1) | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2) installed"
+    else
+      exit 1
+    fi
   elif [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
-    echo 'snap $1 already installed!'
+    echo "snap $1 already installed!"
   else
-    echo 'snap install $1: Failed'
+    echo "snap install $1: Failed"
   fi
 }
 
@@ -309,7 +313,7 @@ snap_install syft --classic --cohort=$ch_syft
 snap_install grype --classic --cohort=$ch_grype
 
 snap set system experimental.parallel-instances=true
-echo 'Fetching snap "docker_rootless"' && snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled
+printf 'Fetching snap "docker_rootless"'\\r && snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled
 snap ack docker_rootless.assert || exit 1
 snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless && rm -f *.assert *.snap
 
@@ -387,7 +391,7 @@ pushd $docker_data >> $pushd_log
   
   cat /tmp/snap_ch_id_*.change >> snap.install
   chown $run_as:$run_as $save_id snap.{info,install,events}
-  printf 'Saved debug info.'\\n
+  printf 'Saved debug info.     '\\n
 popd -- >> $pushd_log && unset save_id id D S
 
 if [[ "$TEST" == *yes* ]]; then
@@ -433,7 +437,7 @@ TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_D
 
 seen1=\"$seen\"
 seen2=\"\$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d 2> /dev/null) | grep session-)\"
-seend=\"\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)\"
+seend=\"\$(echo \$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') || true) | cut -d'>' -f2 | cut -d' ' -f2)\"
 xsid=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo XSID=\$xsid SEEND=\$seend
 echo \$xsid > $docker_data/xs.id
