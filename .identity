@@ -5,13 +5,13 @@ declare -- USERNAME=0mniteck42
 declare -- IDENTITY_FILE=.ssh/$MODULE
 declare -- PKI_ID_FILE=.ssh/.pki
 declare -- PROJECT=$NAME-Reproducible
-declare -- USER="'Shant Patrick Tchatalbachian'"
+declare -- USER='Shant Patrick Tchatalbachian'
 declare -- SIGSTORE_USR=tiger-varsity-alto@duck.com
 declare -- USER_ID=10482171+0mniteck@users.noreply.github.com
 declare -- SIGNING_KEY=42E2DDF1E31B370F8BFFEE03287EE837E6ED2DD3
 declare -- CLIENT_ID=Iv23liF4fUl7FZ7MmEay
 
-git config --global user.name $USER
+git config --global user.name "$USER"
 git config --global user.email $USER_ID
 git config --global user.signingkey $SIGNING_KEY
 git config --global init.defaultBranch main
