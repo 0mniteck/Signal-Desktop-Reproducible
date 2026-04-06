@@ -123,7 +123,7 @@ module=$(grep MODULE= .identity | cut -d'=' -f2)
 arm64_ver=$(grep arm64_ver= .pinned_ver | cut -d'=' -f2)
 amd64_ver=$(grep amd64_ver= .pinned_ver | cut -d'=' -f2)
 
-cohorts=$(sed -n '/ -- {"coh/,/"}}}/p' .pinned_ver | jq -c .[])
+cohorts=$(sed -n '/{"coh/,/"}}}/p' .pinned_ver | jq -c .[])
 ch_docker=$(echo $cohorts | jq -r .docker[])
 ch_syft=$(echo $cohorts | jq -r .syft[])
 ch_grype=$(echo $cohorts | jq -r .grype[])
