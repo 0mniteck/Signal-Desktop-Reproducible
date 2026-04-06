@@ -79,7 +79,7 @@ test() {
   nulled=/tmp/nulled.log
   pushd_log=/tmp/pushd.log
   if [[ "$RUNME" != "" ]]; then
-    rm -f $nulled $pushd_log
+    rm -f $nulled $pushd_log /tmp/ch_id_*
     touch $nulled $pushd_log
     > $nulled; > $pushd_log
   fi
@@ -225,6 +225,7 @@ clean_most() {
 
 clean_all() {
   rm -r -f $home/$snap_path/* \
+  /tmp/snap-private-tmp/snap.docker* \
   $home/snap/docker/ \
   $home/docker/ \
   $home/.docker/ \
@@ -310,16 +311,16 @@ snap_install grype --classic --cohort=$ch_grype
 snap set system experimental.parallel-instances=true
 echo 'Fetching snap "docker_rootless"' && snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled
 snap ack docker_rootless.assert || exit 1
-snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless && rm -r *.assert *.snap
+snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless && rm -f *.assert *.snap
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && \
 echo -e "\nRemoving feature docker_rootless:nvidia-support\nRemoving feature docker_rootless:cdi" || \
 echo "Failed to disable docker_rootless:nvidia-support"
 
-for d in docker-daemon firewall-control network-bind network-control opengl privileged support; do
-  snap disconnect --forget docker_rootless:$d >> $nulled && echo "Removing plug docker_rootless:"$d || exit 1
-done && unset d && sleep 1 && echo
+for P in docker-daemon firewall-control network-bind network-control opengl privileged support; do
+  snap disconnect --forget docker_rootless:$P >> $nulled && echo "Removing plug docker_rootless:"$P || exit 1
+done && unset P && sleep 1 && echo
 
 systemd_ctl_common mask wait --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
@@ -358,6 +359,7 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 pushd $docker_data >> $pushd_log
+  printf 'Saving debug info...'\\r
   unset save_id id D S; > snap.info; > snap.install; > snap.events
   for S in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
   do
@@ -385,6 +387,7 @@ pushd $docker_data >> $pushd_log
   
   cat /tmp/snap_ch_id_*.change >> snap.install
   chown $run_as:$run_as $save_id snap.{info,install,events}
+  printf 'Saved debug info.'\\n
 popd -- >> $pushd_log && unset save_id id D S
 
 if [[ "$TEST" == *yes* ]]; then
