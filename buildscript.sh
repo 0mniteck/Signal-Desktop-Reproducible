@@ -262,9 +262,24 @@ systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
   quiet networkctl delete tun0
 }
 
+snap_install() {
+# $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous)
+# $3 = cohort=cohort_id (optional), $4 = --unaliased (optional), $5 = --name=instance_name (optional)
+  unset ch_id
+  ch_id=$( snap install $1 $2 $3 $4 $5 --no-wait )
+  if [[ "$ch_id" -gt 0 ]]; then
+    snap watch $ch_id
+    snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
+  elif [[ $(snap list $1) ]]; then
+    echo 'snap $1 already installed!'
+  else
+    echo 'snap install $1: Failed'
+  fi
+}
+
 # apparm() { # $1 = [-a/-r] [--add/--replace]
 #   rm -f $apparmor_profile;
-#   cp $apparmor_path/usr.lib.snapd.snap-confine.* $apparmor_profile
+#   cp $apparmor_path/*snap-confine* $apparmor_profile
 #   apparmor_parser $1 -K --abort-on-error --namespace-string docker $apparmor_profile }
 
 quiet() {
@@ -287,28 +302,15 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     echo "Failed apt install"
 
 if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required" exit 1; fi;
-snap remove docker --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker";
+snap remove docker_rootless --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless";
 
-ch_id_syft=$(snap install syft --no-wait --classic --cohort=$ch_syft )
-if [[ "$ch_id_syft" -gt 0 ]]; then
-  snap watch $ch_id_syft
-  snap debug timings $ch_id_syft
-fi
-
-ch_id_grype=$(snap install grype --no-wait --classic --cohort=$ch_grype )
-if [[ "$ch_id_grype" -gt 0 ]]; then
-  snap watch $ch_id_grype
-  snap debug timings $ch_id_grype
-fi
+snap_install syft --classic --cohort=$ch_syft
+snap_install grype --classic --cohort=$ch_grype
 
 snap set system experimental.parallel-instances=true
 snap download --basename=docker_rootless docker --cohort=$ch_docker
 snap ack docker_rootless.assert || exit 1
-ch_id_docker=$(snap install docker_rootless.snap --name=docker_rootless --no-wait --jailmode --unaliased )
-if [[ "$ch_id_docker" -gt 0 ]]; then
-  snap watch $ch_id_docker
-  snap debug timings $ch_id_docker
-fi
+snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && \
@@ -356,32 +358,34 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 pushd $docker_data >> $pushd_log
-  > snap.info; > snap.events
+  unset save_id id D S; > snap.info; > snap.install; > snap.events
   for S in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
   do
     echo "---------------snap-debug-$S---------------" >> snap.info
     quiet "snap $S >> snap.info"
   done && unset S
   
-  for S in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
+  for D in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
   do
     echo '-------------debug-state-change-id-------------' >> snap.events
-    quiet "snap debug state --abs-time --change=$S /var/lib/snapd/state.json >> snap.events"
+    quiet "snap debug state --abs-time --change=$D /var/lib/snapd/state.json >> snap.events"
     echo '--------------debug-state-tasks-id-------------' >> snap.events
-    quiet "snap debug state --abs-time --task=$S /var/lib/snapd/state.json >> snap.events"
+    quiet "snap debug state --abs-time --task=$D /var/lib/snapd/state.json >> snap.events"
     echo '--------------------tasks-id-------------------' >> snap.events
-    quiet "snap tasks $S --abs-time"
+    quiet "snap tasks $D --abs-time"
     echo '------------debug-state-timings-id-------------' >> snap.events
-    quiet "snap debug timings $S >> snap.events"
-  done && unset S
+    quiet "snap debug timings $D >> snap.events"
+  done && unset D
 
-  unset S id; id=$(id -u)
+  id=$(id -u)
   save_id=$id:$id.env
   set > $save_id
   env | sort >> $save_id
   declare >> $save_id
-  chown $run_as:$run_as $save_id snap.{info,events}
-popd -- >> $pushd_log && unset save_id id
+  
+  cat /tmp/snap_ch_id_*.change >> snap.install
+  chown $run_as:$run_as $save_id snap.{info,install,events}
+popd -- >> $pushd_log && unset save_id id D S
 
 if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
@@ -406,11 +410,11 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-$(sleep 10; while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done; if [[ -s $docker_data/xs.id ]]; then mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; fi;) & mk_pid=$!
-echo mk_pid=$mk_pid
+$(sleep 10; while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do sleep 10; done; if [[ -s $docker_data/xs.id ]]; then mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; fi;) & mk_pid=$!
 
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
-$debug_cat & pid_0=$!; echo pid_0=$pid_0
+$debug_cat & pid_0=$!
+echo mk_pid=$mk_pid; echo pid_0=$pid_0
 $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
 
@@ -431,7 +435,7 @@ echo XSID=\$xsid SEEND=\$seend
 echo \$xsid > $docker_data/xs.id
 while [[ -s $docker_data/xs.id ]]
 do
-  wait
+  sleep 1
 done
 
 while [[ \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]
@@ -772,12 +776,12 @@ else
 fi
 
 \$PUSHD_RESULTS && pushd env >> $pushd_log
-  unset id; id=\$(id -u)
+  unset save_id id; id=\$(id -u)
   save_id=\$id:\$id.env
   set > \$save_id
   env | sort >> \$save_id
   declare >> \$save_id
-  mv $docker_data/{0:0.env,snap.{info,events}} .
+  mv $docker_data/{0:0.env,snap.{info,install,events}} .
   cp $rootless_path/env-docker docker.env
   echo -e '\nDocker Version:\n' > docker.info
   quiet '$docker version >> docker.info'
@@ -868,8 +872,8 @@ for P in \$pids
 do
   while [[ \"\$P\" -gt 0 && \$(cat <(lsof -F p -p \$P -R | grep -o \$P)) == *\$P* ]]
   do
-    printf '%s'\\r \$P': pid still running...'
-    echo && quiet kill \$P && echo \"Killed pid: \$P\"
+    printf '%s'\\n \$P': pid still running...'
+    quiet kill \$P && echo \"Killed pid: \$P\"
     sleep 0.1
   done
 done && unset P pids pid_1 pid_2 pid_3
@@ -895,8 +899,8 @@ for P in $pids
 do
   while [[ "$P" -gt 0 && $(cat <(lsof -F p -p $P -R | grep -o $P)) == *$P* ]]
   do
-    printf '%s'\\r $P': pid still running...'
-    echo && quiet kill $P && echo "Killed pid: $P"
+    printf '%s'\\n $P': pid still running...'
+    quiet kill $P && echo "Killed pid: $P"
     sleep 0.1
   done
 done && unset P pids pid_0 mk_pid dir_pid lsof_d
@@ -915,5 +919,4 @@ clean_all || echo "Failed cleanup"
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
-
 exit 0
