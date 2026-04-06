@@ -264,13 +264,15 @@ systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
 
 snap_install() {
 # $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous)
-# $3 = cohort=cohort_id (optional), $4 = --unaliased (optional), $5 = --name=instance_name (optional)
+# $3 = --cohort=cohort_id (optional), $4 = --unaliased (optional), $5 = --name=instance_name (optional)
+  if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required" exit 1; fi;
   unset ch_id
-  ch_id=$( snap install $1 $2 $3 $4 $5 --no-wait )
+  ch_id=$(snap install $1 $2 $3 $4 $5 --no-wait)
   if [[ "$ch_id" -gt 0 ]]; then
     snap watch $ch_id
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
-  elif [[ $(snap list $1) ]]; then
+    if [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then wait; else exit 1; fi;
+  elif [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
     echo 'snap $1 already installed!'
   else
     echo 'snap install $1: Failed'
@@ -301,16 +303,14 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
 
-if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required" exit 1; fi;
 snap remove docker_rootless --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless";
-
 snap_install syft --classic --cohort=$ch_syft
 snap_install grype --classic --cohort=$ch_grype
 
 snap set system experimental.parallel-instances=true
-snap download --basename=docker_rootless docker --cohort=$ch_docker
+echo 'Fetching snap "docker_rootless"' && snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled
 snap ack docker_rootless.assert || exit 1
-snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless
+snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless && rm -r *.assert *.snap
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && \
@@ -391,7 +391,8 @@ if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log
   rootless_path=$home/rootless
-  export -- SYSTEMD_LOG_LEVEL=debug LESSSECURE=1 \
+  export -- \
+  SYSTEMD_LOG_LEVEL=debug NO_COLOR=true LESSSECURE=1 \
   SYSTEMD_LOG_COLOR=false SYSTEMD_COLORS=false \
   SYSTEMD_LOG_LOCATION=true SYSTEMD_LOG_TIME=true \
   SYSTEMD_LOG_TARGET=console SYSTEMD_URLIFY=false
@@ -410,9 +411,9 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-$(sleep 10; while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do sleep 10; done; if [[ -s $docker_data/xs.id ]]; then mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; fi;) & mk_pid=$!
+$(sleep 15; while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do sleep 5; done; if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; fi;) & mk_pid=$!
 
-seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
+seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d 2> /dev/null) | grep session-)"
 $debug_cat & pid_0=$!
 echo mk_pid=$mk_pid; echo pid_0=$pid_0
 $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
@@ -428,18 +429,16 @@ PUSH='$PUSH' PUSHD_LOG='$pushd_log' PUSHD_RESULTS='$pushd_results' RESULTS='$RES
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
 seen1=\"$seen\"
-seen2=\"\$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))\"
-seend=\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)
-xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
+seen2=\"\$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d 2> /dev/null) | grep session-)\"
+seend=\"\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep '>' | cut -d'>' -f2 | cut -d' ' -f2)\"
+xsid=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo XSID=\$xsid SEEND=\$seend
 echo \$xsid > $docker_data/xs.id
-while [[ -s $docker_data/xs.id ]]
-do
+while [[ -f $docker_data/xs.id ]]; do
   sleep 1
 done
 
-while [[ \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]
-do
+while [[ \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf '%s'\\r $mk_pid': mk_pid still running...'
   sleep 0.1
 done
