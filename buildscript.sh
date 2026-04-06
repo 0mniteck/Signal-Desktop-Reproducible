@@ -5,34 +5,36 @@ usage() {
 cat << _EOF
 
 General Usage:
-  Requirements: 1. Ubuntu 24,04.4+ (arm64 or amd64)
-                2. .dotfiles (./.pinned_ver and ./.identity)
-  Synopsis:
-      $0 [options]
-  ex. $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no -- <COMMIT MESSAGE+DESCRIPTION>
- Now: $0 $PRESERVED
+  Synopsis: $0 [options] -- <commit message - description>
+   Example: $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no -- "Successful Build of Release v8.x.x - list of changes..."
+   Current: $0 ${PRESERVED}
 
-  Options: [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
-           [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
-           [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
-           [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h] , [-- <commit message>]
+  Requirements:
+    1. Ubuntu 25.10+ (arm64 or amd64)
+    2. .dotfiles (./.pinned_ver and ./.identity)
+
+  Options:
+    [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
+    [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
+    [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
+    [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h] , [-- <commit message>]
 
   All Options:
-  -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
-  -d, --date <date_epoch|today>    Source date epoch or today (ex. 1774468800)
-  -i, --increment <.version #>     Increment version numbers (ex. .01)
-  -m, --mount <device in /dev>     Mount ephemeral LUKS partition (ex. sdb)
-  -p, --push-branch <branch-name>  Push to branch (ex. 8.22.x)
-  -r, --release-tag <tag-name>     Release tag (ex. 8.44.0)
-  -t, --tests <DEBUG|SKIP_LOGIN>   Skip Docker/Github login (ex. SKIP_LOGIN)
-  -h, --help                       Show this usage file
-  -,  --     <commit+message>      Commit message and description (ex. "8.x Success!")
+    -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
+    -d, --date <date_epoch|today>    Source date epoch or today (ex. 1774468800)
+    -i, --increment <.version #>     Increment version numbers (ex. .01)
+    -m, --mount <device in /dev>     Mount ephemeral LUKS partition (ex. sdb)
+    -p, --push-branch <branch-name>  Push to branch (ex. 8.22.x)
+    -r, --release-tag <tag-name>     Release tag (ex. 8.44.0)
+    -t, --tests <DEBUG|SKIP_LOGIN>   Skip Docker/Github login (ex. SKIP_LOGIN)
+    -h, --help                       Show this usage file
+    -,  -- <commit message - desc>   Commit message (ex. "8.x Success! - changes...")
 
-Maintainers:
-- ID: @0mniteck (Shant) <shant@omniteck.com>
-  - GPG: <10482171+0mniteck@users.noreply.github.com>
-  - COSIGN: <tiger-varsity-alto@duck.com>
-  - CONTACT: <shantt@duck.com>
+  Maintainers:
+    - ID: @0mniteck (Shant) <shant@omniteck.com> ${WEBSITE}
+      - GPG/GIT: <10482171+0mniteck@users.noreply.github.com>
+      - COSIGN/SIGSTORE: <tiger-varsity-alto@duck.com>
+      - CONTACT/MAILTO: ${CONTACT}
 
 _EOF
 }
@@ -49,6 +51,9 @@ SHORT="e:c:d:i:m:p:r:t:h"
 PARSED=$(POSIXLY_CORRECT=yes $GETOPT --name "$0" -u \
 --longoptions "$LONG" --options "$SHORT" -- "$@") && \
 eval echo "$PARSED" > /dev/null || { usage; exit 2; }
+pre="printf '\e]8;;"; mid="\e\\"; post="\e]8;;\e\\\n'"
+CONTACT="${pre}mailto:shantt@duck.com${mid}<shantt@duck.com>${post}"
+WEBSITE="${pre}https://omniteck.com${mid}OMNITECK.com${post}"
 
 while [[ "$1" != "" ]]; do
   ERR="'Unknown Error! '$1'='$2"
@@ -118,7 +123,7 @@ module=$(grep MODULE= .identity | cut -d'=' -f2)
 arm64_ver=$(grep arm64_ver= .pinned_ver | cut -d'=' -f2)
 amd64_ver=$(grep amd64_ver= .pinned_ver | cut -d'=' -f2)
 
-cohorts=$(sed -n '/{"coh/,/"}}}/p' .pinned_ver | jq -c .[])
+cohorts=$(sed -n '/ -- {"coh/,/"}}}/p' .pinned_ver | jq -c .[])
 ch_docker=$(echo $cohorts | jq -r .docker[])
 ch_syft=$(echo $cohorts | jq -r .syft[])
 ch_grype=$(echo $cohorts | jq -r .grype[])
@@ -179,12 +184,13 @@ local_lib=$home/docker/lib
 data_dir=$local_data/share
 rootless_path=$data_dir/rootless
 apparmor_path=/etc/apparmor.d
-apparmor_profile=$apparmor_path/re-snapped.rootless.docker
+apparmor_profile=$apparmor_path/re-snapd.rootless.docker
+cgroup_base=/sys/fs/cgroup/user.slice/user-${run_id}.slice
 sc_rules=/lib/udev/rules.d/60-scdaemon.rules
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
 systemd_path=/etc/systemd/system
-systemd_service=$systemd_path/snap.docker.dockerd.service
+systemd_service=$systemd_path/snap.docker_rootless.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
 var_docker=/var/snap/docker
 snap_path=snap/docker_rootless/$docker_snap_ver
@@ -195,7 +201,7 @@ docker=$docker_path/docker
 dockerd=${docker}d
 
 sed_ech=$(cat << ___EOF
-Conflicts=snap.docker.dockerd.service\\
+Conflicts=snap.docker_rootless.dockerd.service\\ snap.docker.dockerd.service\\
 AssertUser=$run_id\\
 AssertGroup=$run_id\\
 AllowIsolate=true\\
@@ -210,7 +216,7 @@ ___EOF
 
 clean_most() {
   rm -r -f /home/root/* \
-  /root/snap/docker/ \
+  /root/snap/docker* \
   $docker_data* \
   $var_docker/common/* \
   $var_docker/$docker_snap_ver/* \
@@ -220,25 +226,25 @@ clean_most() {
   /run/containerd/ \
   /run/docker* \
   /run/runc/ \
-  /run/snap.docker/
+  /run/snap.docker*
 }
 
 clean_all() {
   rm -r -f $home/$snap_path/* \
   /tmp/snap-private-tmp/snap.docker* \
-  $home/snap/docker/ \
+  $home/snap/docker* \
   $home/docker/ \
   $home/.docker/ \
   $data_dir/rootless* \
   $data_dir/systemd/ \
-  $var_docker/ \
+  $var_docker* \
   /usr/libexec/docker/ \
   /var/lib/snapd/cache/*
   clean_most || echo "Failed cleanup"
 }
 
 unmount() {
-  quiet snap stop --disable docker && sleep 1
+  quiet snap stop --disable docker_rootless && sleep 1
   if [[ -d $docker_data ]]; then
     lsof_d="$(cat <(lsof -F p $docker_data | cut -d'p' -f2 || true))"
     if [[ "$lsof_d" -gt 0 ]]; then
@@ -256,31 +262,32 @@ systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
   snap stop --disable docker_rootless.nvidia-container-toolkit && $2
   systemctl daemon-reload && $2
   systemctl reset-failed && $2
-  systemctl stop snap.docker.* --all && $2
-  quiet systemctl $1 snap.docker.nvidia-container-toolkit --runtime $3
-  quiet systemctl $1 snap.docker.dockerd --runtime $3
+  systemctl stop snap.docker_rootless.* --all && $2
+  quiet systemctl $1 snap.docker_rootless.nvidia-container-toolkit --runtime $3
+  quiet systemctl $1 snap.docker_rootless.dockerd --runtime $3
   quiet networkctl delete docker0
   quiet networkctl delete tun0
 }
 
 snap_install() {
-# $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous)
-# $3 = --cohort=cohort_id (optional), $4 = --unaliased (optional), $5 = --name=instance_name (optional)
-  if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required" exit 1; fi;
+# $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous), $3 = cohort_id
+# $4 = --unaliased (optional), $5 = --name=instance_name (optional)
+  if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required!" exit 1; fi;
   unset ch_id
-  ch_id=$(snap install $1 $2 $3 $4 $5 --no-wait)
+  ch_id=$(snap install $1 $2 --cohort=$3 $4 $5 --no-wait)
   if [[ "$ch_id" -gt 0 ]]; then
     snap watch $ch_id
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
     if [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
-      echo "$1 v$(snap list $(echo $1 | cut -d'.' -f1) | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2) installed"
+      echo "$(echo $1 | cut -d'.' -f1) \
+v$(snap list $(echo $1 | cut -d'.' -f1) | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2 | cut -d' ' -f2) installed from cohort id \"$3\""
     else
       exit 1
     fi
   elif [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
-    echo "snap $1 already installed!"
+    echo -e "\nsnap $(echo $1 | cut -d'.' -f1) already installed!\nRemove then re-install to validate cohort!\n"
   else
-    echo "snap install $1: Failed"
+    echo "snap install $(echo $1 | cut -d'.' -f1): Failed!"
   fi
 }
 
@@ -309,22 +316,22 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     echo "Failed apt install"
 
 snap remove docker_rootless --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless";
-snap_install syft --classic --cohort=$ch_syft
-snap_install grype --classic --cohort=$ch_grype
+snap_install syft --classic $ch_syft
+snap_install grype --classic $ch_grype
 
 snap set system experimental.parallel-instances=true
 printf 'Fetching snap "docker_rootless"'\\r && snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled
 snap ack docker_rootless.assert || exit 1
-snap_install docker_rootless.snap --jailmode --unaliased --name=docker_rootless && rm -f *.assert *.snap
+snap_install docker_rootless.snap --jailmode $ch_docker --unaliased --name=docker_rootless && rm -f *.assert *.snap
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && \
 echo -e "\nRemoving feature docker_rootless:nvidia-support\nRemoving feature docker_rootless:cdi" || \
 echo "Failed to disable docker_rootless:nvidia-support"
 
-for P in docker-daemon firewall-control network-bind network-control opengl privileged support; do
-  snap disconnect --forget docker_rootless:$P >> $nulled && echo "Removing plug docker_rootless:"$P || exit 1
-done && unset P && sleep 1 && echo
+for plug in docker-daemon firewall-control network-bind network-control opengl privileged support; do
+  snap disconnect --forget docker_rootless:$plug >> $nulled && echo "Removing plug docker_rootless:"$plug || exit 1
+done && unset plug && sleep 1 && echo
 
 systemd_ctl_common mask wait --now
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
@@ -364,35 +371,36 @@ fi
 
 pushd $docker_data >> $pushd_log
   printf 'Saving debug info...'\\r
-  unset save_id id D S; > snap.info; > snap.install; > snap.events
-  for S in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
-  do
-    echo "---------------snap-debug-$S---------------" >> snap.info
-    quiet "snap $S >> snap.info"
-  done && unset S
+  unset debug state id save_id
+  > snap.info; > snap.install; > snap.events
   
-  for D in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
+  for debug in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
   do
-    echo '-------------debug-state-change-id-------------' >> snap.events
-    quiet "snap debug state --abs-time --change=$D /var/lib/snapd/state.json >> snap.events"
-    echo '--------------debug-state-tasks-id-------------' >> snap.events
-    quiet "snap debug state --abs-time --task=$D /var/lib/snapd/state.json >> snap.events"
-    echo '--------------------tasks-id-------------------' >> snap.events
-    quiet "snap tasks $D --abs-time"
-    echo '------------debug-state-timings-id-------------' >> snap.events
-    quiet "snap debug timings $D >> snap.events"
-  done && unset D
+    echo "---------------snap-debug-$debug---------------" >> snap.info
+    quiet "snap $debug >> snap.info"
+  done && unset debug
+  
+  for state in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
+  do
+    echo "-------------debug-state-change-$state-------------" >> snap.events
+    quiet "snap debug state --abs-time --change=$state /var/lib/snapd/state.json >> snap.events"
+    echo "--------------debug-state-tasks-$state-------------" >> snap.events
+    quiet "snap debug state --abs-time --task=$state /var/lib/snapd/state.json >> snap.events"
+    echo "--------------------tasks-$state-------------------" >> snap.events
+    quiet "snap tasks $state --abs-time >> snap.events"
+    echo "------------debug-state-timings-$state-------------" >> snap.events
+    quiet "snap debug timings $state >> snap.events"
+  done && unset state
 
   id=$(id -u)
   save_id=$id:$id.env
   set > $save_id
   env | sort >> $save_id
   declare >> $save_id
-  
   cat /tmp/snap_ch_id_*.change >> snap.install
   chown $run_as:$run_as $save_id snap.{info,install,events}
-  printf 'Saved debug info.     '\\n
-popd -- >> $pushd_log && unset save_id id D S
+  printf 'Saved debug info     '\\n\\n
+popd -- >> $pushd_log && unset debug state id save_id
 
 if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
@@ -403,8 +411,8 @@ if [[ "$TEST" == *yes* ]]; then
   SYSTEMD_LOG_COLOR=false SYSTEMD_COLORS=false \
   SYSTEMD_LOG_LOCATION=true SYSTEMD_LOG_TIME=true \
   SYSTEMD_LOG_TARGET=console SYSTEMD_URLIFY=false
-  debug_cat="journalctl -o cat -t USR_RNLVL -f"
-  systemd_cat="systemd-cat -t USR_RNLVL -p debug"
+  debug_cat="journalctl --output=cat --identifier=USR_RNLVL --follow"
+  systemd_cat="systemd-cat --identifier=USR_RNLVL --priority=debug"
 else
   push="--push"
   declare -- PUSH="$push"
@@ -418,11 +426,12 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-$(sleep 15; while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do sleep 5; done; if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; fi;) & mk_pid=$!
+wait1="while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;"
+wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"; rem="rm -f $docker_data/xs.id; fi;"
+$(sleep 5; $wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem) & mk_pid=$!
+seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
-seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d 2> /dev/null) | grep session-)"
 $debug_cat & pid_0=$!
-echo mk_pid=$mk_pid; echo pid_0=$pid_0
 $systemd_cat machinectl shell $run_as@.host /bin/env - /bin/bash --norc --noprofile -c "
 $debug && cd $PWD
 
@@ -436,21 +445,18 @@ PUSH='$PUSH' PUSHD_LOG='$pushd_log' PUSHD_RESULTS='$pushd_results' RESULTS='$RES
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
 seen1=\"$seen\"
-seen2=\"\$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d 2> /dev/null) | grep session-)\"
+seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
 seend=\"\$(echo \$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') || true) | cut -d'>' -f2 | cut -d' ' -f2)\"
-xsid=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
-echo XSID=\$xsid SEEND=\$seend
-echo \$xsid > $docker_data/xs.id
-while [[ -f $docker_data/xs.id ]]; do
-  sleep 1
-done
+XDG_USR_SESSION=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
+echo \$XDG_USR_SESSION > $docker_data/xs.id
+while [[ -f $docker_data/xs.id ]]; do wait; done;
 
 while [[ \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
-  printf '%s'\\r $mk_pid': mk_pid still running...'
-  sleep 0.1
+  printf $mk_pid': \$mk_pid still running...'\\r
+  wait
 done
-mkdir -p \$seend/slirp4 && echo 'XDG_SESSION: Directory created' || echo 'SEENd Failed'
 
+mkdir -p \$seend/slirp4 && echo \"XDG_USR_SESSION=\$XDG_USR_SESSION - Session directory created!\" || exit 1
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
 
@@ -610,8 +616,8 @@ clean_some() {
 sys_ctl_common() {
   systemctl --user daemon-reload && wait
   systemctl --user reset-failed && wait
-  systemctl --user stop docker* --all && wait
   systemctl --user start dbus && wait
+  systemctl --user stop docker* --all && wait
   grep 0 <(systemctl --user list-units docker* --all --no-pager) || exit 1
   grep inactive <(grep active <(systemctl --user is-active dbus) || exit 1) && exit 1
 }
@@ -711,14 +717,13 @@ fi
 unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
-rel_ver=\$(git log --pretty=reference --grep=Successful\\ Build\\ of\\ Release\\ \$date_rel | wc -l)
-sub_ver=\$(git submodule --quiet foreach \"git log --pretty=reference --grep=\$rel_date\" | wc -l)
+rel_ver=\$(git log --pretty=reference --grep=\\ \$date_rel | wc -l)
 
 export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
 source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
 echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
-rm -r -f Results* $results* && mkdir -p $results/{arm64,amd64,source,env} || exit 1
+rm -r -f Results* $results* && mkdir -p $results/{arm64,amd64,source,env,debug} || exit 1
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
@@ -734,7 +739,7 @@ env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $ro
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
-BUILDKIT_TTY_LOG_LINES=$(($LINES - 15))
+BUILDKIT_TTY_LOG_LINES=\$((\$LINES - 15))
 BUILDX_GIT_LABELS=full
 BUILDX_METADATA_PROVENANCE=max
 BUILDX_METADATA_WARNINGS=1
@@ -746,11 +751,11 @@ GRYPE_DB_CACHE_DIR=$docker_data/grype
 HOME=$home
 NO_COLOR=true
 PATH=$path:$docker_path:$home/docker/bin
-SOURCE_DATE_EPOCH=\$sde
+SOURCE_DATE_EPOCH=\$SDE
 SYFT_CACHE_DIR=$docker_data/syft
 TERM=$term
 XDG_CONFIG_HOME=$home
-XDG_SESSION_ID=\$xsid
+XDG_SESSION_ID=\$XDG_USR_SESSION
 XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
 
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
@@ -782,12 +787,12 @@ else
 fi
 
 \$PUSHD_RESULTS && pushd env >> $pushd_log
-  unset save_id id; id=\$(id -u)
+  unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env
   set > \$save_id
   env | sort >> \$save_id
   declare >> \$save_id
-  mv $docker_data/{0:0.env,snap.{info,install,events}} .
+  mv $docker_data/0:0.env .
   cp $rootless_path/env-docker docker.env
   echo -e '\nDocker Version:\n' > docker.info
   quiet '$docker version >> docker.info'
@@ -797,7 +802,9 @@ fi
   quiet '$docker buildx version >> docker.info'
   echo -e '\nBuildx Inspect:\n' >> docker.info
   quiet '$docker buildx inspect --bootstrap >> docker.info'
-\$POPD && \$POPD && unset save_id id
+\$POPD && pushd debug >> $pushd_log
+  mv $docker_data/snap.{info,install,events} .
+\$POPD && \$POPD unset id save_id
 
 if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
@@ -840,8 +847,8 @@ fi
 
 if [[ \"\$rel_ver\" -lt 1 ]]; then
   wait
-elif [[ \"\$sub_ver\" -ge 1 ]]; then
-  subver \$sub_ver
+elif [[ \"\$rel_ver\" -gt 1 ]]; then
+  subver \$rel_ver
 else
   sub_ver=1
   subver \$sub_ver
@@ -874,15 +881,15 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
 fi
 
 pids=\"\$pid_1 \$pid_2 \$pid_3\"
-for P in \$pids
+for pid in \$pids
 do
-  while [[ \"\$P\" -gt 0 && \$(cat <(lsof -F p -p \$P -R | grep -o \$P)) == *\$P* ]]
+  while [[ \"\$pid\" -gt 0 && \$(cat <(lsof -F p -p \$pid -R | grep -o \$pid)) == *\$pid* ]]
   do
-    printf '%s'\\n \$P': pid still running...'
-    quiet kill \$P && echo \"Killed pid: \$P\"
+    printf \$pid': \$pid still running...'\\n
+    quiet kill \$pid && echo \"Killed pid: \$pid\"
     sleep 0.1
   done
-done && unset P pids pid_1 pid_2 pid_3
+done && unset pid pids pid_1 pid_2 pid_3
 
 docker-credential-pass erase &
 ssh-add -D && eval \$(ssh-agent -k)
@@ -901,15 +908,15 @@ if [[ -d $home/$snap_path ]]; then
 fi
 
 pids="$pid_0 $mk_pid $dir_pid $lsof_d"
-for P in $pids
+for pid in $pids
 do
-  while [[ "$P" -gt 0 && $(cat <(lsof -F p -p $P -R | grep -o $P)) == *$P* ]]
+  while [[ "$pid" -gt 0 && $(cat <(lsof -F p -p $pid -R | grep -o $pid)) == *$pid* ]]
   do
-    printf '%s'\\n $P': pid still running...'
-    quiet kill $P && echo "Killed pid: $P"
+    printf $pid': $pid still running...'\\n
+    quiet kill $pid && echo "Killed pid: $pid"
     sleep 0.1
   done
-done && unset P pids pid_0 mk_pid dir_pid lsof_d
+done && unset pid pids pid_0 mk_pid dir_pid lsof_d
 
 clean_all || echo "Failed cleanup"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
