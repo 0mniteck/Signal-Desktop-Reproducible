@@ -387,10 +387,10 @@ if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log
   rootless_path=$home/rootless
-  SYSTEMD_LOG_LEVEL=debug; LESSSECURE=1
-  SYSTEMD_LOG_COLOR=false; SYSTEMD_COLORS=false
-  SYSTEMD_LOG_LOCATION=true; SYSTEMD_LOG_TIME=true
-  SYSTEMD_LOG_TARGET=console; SYSTEMD_URLIFY=false
+  export -- SYSTEMD_LOG_LEVEL=debug LESSSECURE=1 \
+  SYSTEMD_LOG_COLOR=false SYSTEMD_COLORS=false \
+  SYSTEMD_LOG_LOCATION=true SYSTEMD_LOG_TIME=true \
+  SYSTEMD_LOG_TARGET=console SYSTEMD_URLIFY=false
   debug_cat="journalctl -o cat -t USR_RNLVL -f"
   systemd_cat="systemd-cat -t USR_RNLVL -p debug"
 else
@@ -406,10 +406,7 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-$(sleep 10; while [[ ! -f $docker_data/xs.id ]]; do wait; done; \
-if [[ -f $docker_data/xs.id ]]; then \
-mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; \
-rm -f $docker_data/xs.id; fi;) & mk_pid=$!
+$(sleep 10; while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done; if [[ -s $docker_data/xs.id ]]; then mkdir -p /sys/fs/cgroup/user.slice/user-$run_id.slice/session-$(cat $docker_data/xs.id).scope/slirp4; rm -f $docker_data/xs.id; fi;) & mk_pid=$!
 echo mk_pid=$mk_pid
 
 seen="$(cat <(find /sys/fs/cgroup/user.slice/user-$run_id.slice -type d))"
@@ -432,7 +429,7 @@ seend=\$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') | grep
 xsid=\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)
 echo XSID=\$xsid SEEND=\$seend
 echo \$xsid > $docker_data/xs.id
-while [[ -f $docker_data/xs.id ]]
+while [[ -s $docker_data/xs.id ]]
 do
   wait
 done
@@ -872,7 +869,7 @@ do
   while [[ \"\$P\" -gt 0 && \$(cat <(lsof -F p -p \$P -R | grep -o \$P)) == *\$P* ]]
   do
     printf '%s'\\r \$P': pid still running...'
-    quiet kill \$P && echo \"Killed pid: \$P\"
+    echo && quiet kill \$P && echo \"Killed pid: \$P\"
     sleep 0.1
   done
 done && unset P pids pid_1 pid_2 pid_3
@@ -899,7 +896,7 @@ do
   while [[ "$P" -gt 0 && $(cat <(lsof -F p -p $P -R | grep -o $P)) == *$P* ]]
   do
     printf '%s'\\r $P': pid still running...'
-    quiet kill $P && echo "Killed pid: $P"
+    echo && quiet kill $P && echo "Killed pid: $P"
     sleep 0.1
   done
 done && unset P pids pid_0 mk_pid dir_pid lsof_d
@@ -911,11 +908,12 @@ systemd_ctl_common unmask sleep\ 1
 snap remove syft --purge --terminate
 snap remove grype --purge --terminate
 snap remove docker_rootless --purge --terminate 2>> $nulled && sleep 1
-snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker"
+snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker Rootless"
 
 clean_all || echo "Failed cleanup"
 
 if [[ "$TEST" == "yes" ]]; then
   chown $run_as:$run_as $nulled $pushd_log
 fi
+
 exit 0
