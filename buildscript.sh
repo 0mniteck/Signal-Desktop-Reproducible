@@ -269,7 +269,7 @@ snap_install() { # $1 = snap to install, $2 = mode (--classic,--jailmode,--devmo
     if [[ $(snap list $name) ]]; then version="$(snap list $name | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)";
       if [[ "$5" == "" ]]; then wait; else version="$(echo $version | cut -d' ' -f2) "; fi;
       echo "${name} v${version}installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\"";
-    else; exit 1; fi;
+    else exit 1; fi;
   elif [[ $(snap list $name) ]]; then echo -e "\nsnap $name already installed!\nRemove then re-install to validate cohort!\n"; else
     echo "snap install $name: Failed!"; fi; unset ch_id name version;
 }
