@@ -456,7 +456,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf $mk_pid': seen-daemon(seend) still running...\r' && sleep 5
-done && mkdir \$seend/slirp4 && \
+done && mkdir -p \$seend/slirp4 && \
 printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 created!\"\\n\\n || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
