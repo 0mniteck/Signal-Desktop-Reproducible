@@ -279,9 +279,9 @@ snap_install() {
     snap watch $ch_id
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
     if [[ $(snap list $name) ]]; then
-      version=$(snap list $name | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)
-      if [[ "$5" == "" ]]; then wait; else version=$(echo $version | cut -d' ' -f2); fi;
-      echo "$name v$version installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\""
+      version="$(snap list $name | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)"
+      if [[ "$5" == "" ]]; then wait; else version="$(echo $version | cut -d' ' -f2) "; fi;
+      echo "${name} v${version}installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\""
     else
       exit 1
     fi
@@ -437,7 +437,7 @@ wait1="while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;"
 wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
 rem="rm -f $docker_data/xs.id; fi;"
 
-$(sleep 5; $(echo $wait1 $wait2) mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $(echo $rem)) & mk_pid=$!
+$(sleep 5; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem") & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
