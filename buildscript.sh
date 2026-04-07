@@ -372,8 +372,7 @@ if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
     unset debugger states state id save_id
     > snap.info; > snap.install; > snap.events
     
-    for debugger in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
-    do
+    for debugger in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
       echo "---------------snap-$debugger---------------" >> snap.info
       quiet "snap $debugger >> snap.info"
     done && unset debugger
@@ -383,8 +382,7 @@ if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
       unset states
       echo "Too many change ID's, start from a clean snapd install to run debugger"
     fi
-    for state in $states
-    do
+    for state in $states; do
       echo "-------------debug-state-change-$state-------------" >> snap.events
       quiet "snap debug state --abs-time --change=$state /var/lib/snapd/state.json >> snap.events"
       echo "--------------debug-state-tasks-$state-------------" >> snap.events
@@ -457,8 +455,7 @@ XDG_USR_SESSION=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
-  printf $mk_pid': seen-daemon(seend) still running...'\\r
-  sleep 5
+  printf $mk_pid': seen-daemon(seend) still running...'\\r && sleep 5
 done && mkdir \$seend/slirp4 &&\
 printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 created!\"\\n\\n || exit 1
 
