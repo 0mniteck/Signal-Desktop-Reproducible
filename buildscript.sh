@@ -280,7 +280,8 @@ snap_install() {
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
     if [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
       echo "$(echo $1 | cut -d'.' -f1) \
-v$(snap list $(echo $1 | cut -d'.' -f1) | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2 | cut -d' ' -f2) installed from cohort id \"$3\""
+v$(snap list $(echo $1 | cut -d'.' -f1) | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)\
+installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\""
     else
       exit 1
     fi
@@ -370,17 +371,22 @@ if [[ "$MOUNT" != "" ]]; then
 fi
 
 pushd $docker_data >> $pushd_log
-  printf 'Saving debug info...'\\r
-  unset debug state id save_id
+  printf 'Saving debugger info...'\\r
+  unset debugger states state id save_id
   > snap.info; > snap.install; > snap.events
   
-  for debug in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
+  for debugger in {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}
   do
-    echo "---------------snap-debug-$debug---------------" >> snap.info
-    quiet "snap $debug >> snap.info"
-  done && unset debug
-  
-  for state in $(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
+    echo "---------------snap-$debugger---------------" >> snap.info
+    quiet "snap $debugger >> snap.info"
+  done && unset debugger
+
+  states=$(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
+  if [[ "$((${#states[0]}/2))" -ge 100 || "$FORCE_ALL" == *yes* ]]; then
+    unset states
+    echo "Too many change ID's, start from a clean snapd install to run debugger"
+  fi
+  for state in $states
   do
     echo "-------------debug-state-change-$state-------------" >> snap.events
     quiet "snap debug state --abs-time --change=$state /var/lib/snapd/state.json >> snap.events"
@@ -390,7 +396,7 @@ pushd $docker_data >> $pushd_log
     quiet "snap tasks $state --abs-time >> snap.events"
     echo "------------debug-state-timings-$state-------------" >> snap.events
     quiet "snap debug timings $state >> snap.events"
-  done && unset state
+  done && unset states state
 
   id=$(id -u)
   save_id=$id:$id.env
@@ -399,8 +405,8 @@ pushd $docker_data >> $pushd_log
   declare >> $save_id
   cat /tmp/snap_ch_id_*.change >> snap.install
   chown $run_as:$run_as $save_id snap.{info,install,events}
-  printf 'Saved debug info     '\\n\\n
-popd -- >> $pushd_log && unset debug state id save_id
+  printf 'Saved debugger info     '\\n\\n
+popd -- >> $pushd_log && unset debugger states state id save_id
 
 if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
