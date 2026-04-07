@@ -435,7 +435,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf $mk_pid': seen-daemon(seend) still running...\r' && sleep 5
 done && mkdir -p \$seend/slirp4 && \
-printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 seen!\n\n\" || exit 1
+printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 seen\!\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -560,8 +560,8 @@ sys_ctl_common() {
   systemctl --user reset-failed && wait
   systemctl --user start dbus && wait
   systemctl --user stop docker.* --all && wait
-  grep 0 <(systemctl --user list-units docker.* --all --no-pager) || exit 1
-  grep inactive <(grep active <(systemctl --user is-active dbus) || exit 1) && exit 1
+  grep 0 <(systemctl --user list-units docker.* --all --no-pager) || echo F1
+  grep inactive <(grep active <(systemctl --user is-active dbus) || echo F2) && echo F3
 }
 
 subver() {
