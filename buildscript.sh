@@ -103,7 +103,7 @@ elif [[ "$TEST" != *yes* ]]; then
   TEST="yes"
   test
 else
-  unset debug
+  debug="echo"
   DEBUG="no"
   TESTS="DEBUG=no"
   TEST="yes"
@@ -432,8 +432,10 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-wait1="while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;"
-wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"; rem="rm -f $docker_data/xs.id; fi;"
+wait1="$(echo 'while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;')"
+wait2="$(echo 'if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then')"
+rem="$(echo 'rm -f $docker_data/xs.id; fi;')"
+
 $(sleep 5; $wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem) & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
