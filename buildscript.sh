@@ -280,7 +280,7 @@ snap_install() {
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
     if [[ $(snap list $name) ]]; then
       version=$(snap list $name | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)
-      if [[ "$5" == "" ]]; then wait; else version=$(echo $version | cut -d' ' -f2)
+      if [[ "$5" == "" ]]; then wait; else version=$(echo $version | cut -d' ' -f2); fi;
       echo "$name v$version installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\""
     else
       exit 1
