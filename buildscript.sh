@@ -273,23 +273,24 @@ snap_install() {
 # $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous), $3 = cohort_id
 # $4 = --unaliased (optional), $5 = --name=instance_name (optional)
   if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required!" exit 1; fi;
-  unset ch_id
+  unset ch_id name version; name=$(echo $1 | cut -d'.' -f1)
   ch_id=$(snap install $1 $2 --cohort=$3 $4 $5 --no-wait)
   if [[ "$ch_id" -gt 0 ]]; then
     snap watch $ch_id
     snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change
-    if [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
-      echo "$(echo $1 | cut -d'.' -f1) \
-v$(snap list $(echo $1 | cut -d'.' -f1) | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)\
-installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\""
+    if [[ $(snap list $name) ]]; then
+      version=$(snap list $name | cut -d' ' -f3 | tr '\n' ' ' | cut -d'v' -f2)
+      if [[ "$5" == "" ]]; then wait; else version=$(echo $version | cut -d' ' -f2)
+      echo "$name v$version installed from cohort id \"$(echo $3 | sed -E "s/(.{$(($LINES/2))}).*/\1.../" )\""
     else
       exit 1
     fi
-  elif [[ $(snap list $(echo $1 | cut -d'.' -f1)) ]]; then
-    echo -e "\nsnap $(echo $1 | cut -d'.' -f1) already installed!\nRemove then re-install to validate cohort!\n"
+  elif [[ $(snap list $name) ]]; then
+    echo -e "\nsnap $name already installed!\nRemove then re-install to validate cohort!\n"
   else
-    echo "snap install $(echo $1 | cut -d'.' -f1): Failed!"
+    echo "snap install $name: Failed!"
   fi
+  unset ch_id name version
 }
 
 # apparm() { # $1 = [-a/-r] [--add/--replace]
@@ -317,13 +318,13 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     echo "Failed apt install"
 
 snap remove docker_rootless --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless";
-snap_install syft --classic $ch_syft
-snap_install grype --classic $ch_grype
+snap_install syft --classic $ch_syft || exit 1
+snap_install grype --classic $ch_grype || exit 1
 
 snap set system experimental.parallel-instances=true
 printf 'Fetching snap "docker_rootless"'\\r && snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled
 snap ack docker_rootless.assert || exit 1
-snap_install docker_rootless.snap --jailmode $ch_docker --unaliased --name=docker_rootless && rm -f *.assert *.snap
+snap_install docker_rootless.snap --jailmode $ch_docker --unaliased --name=docker_rootless && rm -f *.assert *.snap || exit 1
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && \
@@ -432,11 +433,11 @@ else
   declare -- CROSS="$SINGLE"
 fi
 
-wait1="$(echo 'while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;')"
-wait2="$(echo 'if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then')"
-rem="$(echo 'rm -f $docker_data/xs.id; fi;')"
+wait1="while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;"
+wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
+rem="rm -f $docker_data/xs.id; fi;"
 
-$(sleep 5; $wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem) & mk_pid=$!
+$(sleep 5; $(echo $wait1 $wait2) mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $(echo $rem)) & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
