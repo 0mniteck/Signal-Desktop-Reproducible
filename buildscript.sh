@@ -6,7 +6,7 @@ cat << _EOF
 
 General Usage:
   Synopsis: $0 [options] -- <commit message - description>
-   Example: $0 --mount sdb --increment .01 --push-branch 8.x.x --date today --cross-compile yes --test no -- "Successful Build of Release v8.x.x - list of changes..."
+   Example: $0 --increment .01 --push-branch 8.x.x --date today -- "Successful Release v8.x.x - changes..."
    Current: $0 ${PRESERVED}
 
   Requirements:
@@ -28,13 +28,13 @@ General Usage:
     -r, --release-tag <tag-name>     Release tag (ex. 8.44.0)
     -t, --tests <DEBUG|SKIP_LOGIN>   Skip Docker/Github login (ex. SKIP_LOGIN)
     -h, --help                       Show this usage file
-    -,  -- <commit message - desc>   Commit message (ex. "8.x Success! - changes...")
+    - , -- <commit message - desc>   Commit message (ex. "8.x Success! - changes...")
 
   Maintainers:
-    - ID: @0mniteck (Shant) <shant@omniteck.com> ${WEBSITE}
+    - ID: @0mniteck (Shant) <shant@omniteck.com> https://[0,o]mniteck.com
       - GPG/GIT: <10482171+0mniteck@users.noreply.github.com>
       - COSIGN/SIGSTORE: <tiger-varsity-alto@duck.com>
-      - CONTACT/MAILTO: ${CONTACT}
+      - CONTACT/MAILTO: <shantt@duck.com>
 
 _EOF
 }
@@ -51,9 +51,6 @@ SHORT="e:c:d:i:m:p:r:t:h"
 PARSED=$(POSIXLY_CORRECT=yes $GETOPT --name "$0" -u \
 --longoptions "$LONG" --options "$SHORT" -- "$@") && \
 eval echo "$PARSED" > /dev/null || { usage; exit 2; }
-pre="printf '\e]8;;"; mid="\e\\"; post="\e]8;;\e\\\n'"
-CONTACT="${pre}mailto:shantt@duck.com${mid}<shantt@duck.com>${post}"
-WEBSITE="${pre}https://omniteck.com${mid}OMNITECK.com${post}"
 
 while [[ "$1" != "" ]]; do
   ERR="'Unknown Error! '$1'='$2"
@@ -150,15 +147,14 @@ if [[ "$TEST" == *yes* ]]; then
 cat << __EOF
 
 Tag Release: $TAG
-Push to Branch: $BRANCH
 Commit Message: $COMMIT
+Push to Branch: $BRANCH
 Cross Compile: $CROSS
 Override Date: $EPOCH
 Increment: $INC
 Mount: /dev/$MOUNT
 Run Tests: TEST=$TEST - TESTS=$TESTS - $TESTS
 Run Level: $RUNME
-
 __EOF
 fi
 
@@ -201,7 +197,7 @@ docker=$docker_path/docker
 dockerd=${docker}d
 
 sed_ech=$(cat << ___EOF
-Conflicts=snap.docker_rootless.dockerd.service\\ snap.docker.dockerd.service\\
+Conflicts=snap.docker_rootless.dockerd.service\ snap.docker.dockerd.service\\
 AssertUser=$run_id\\
 AssertGroup=$run_id\\
 AllowIsolate=true\\
@@ -210,7 +206,7 @@ Type=exec\\
 Group=$run_as\\
 ExitType=cgroup\\
 Slice=docker.slice\\
-Delegate=cpu\\ cpuset\\ io\\ memory\\ pids\\
+Delegate=cpu\ cpuset\ io\ memory\ pids\\
 ___EOF
 )
 
@@ -437,7 +433,7 @@ wait1="while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;"
 wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
 rem="rm -f $docker_data/xs.id; fi;"
 
-$(sleep 5; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem") & mk_pid=$!
+$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem") & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
@@ -461,11 +457,11 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 while [[ -f $docker_data/xs.id ]]; do wait; done;
 
 while [[ \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
-  printf $mk_pid': \$mk_pid still running...'\\r
+  printf $mk_pid': pid still running...'\\r
   wait
 done
 
-mkdir -p \$seend/slirp4 && echo \"XDG_USR_SESSION=\$XDG_USR_SESSION - Session directory created!\" || exit 1
+mkdir -p \$seend/slirp4 && echo \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 created!\" || exit 1
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
 
@@ -626,8 +622,8 @@ sys_ctl_common() {
   systemctl --user daemon-reload && wait
   systemctl --user reset-failed && wait
   systemctl --user start dbus && wait
-  systemctl --user stop docker* --all && wait
-  grep 0 <(systemctl --user list-units docker* --all --no-pager) || exit 1
+  systemctl --user stop docker.* --all && wait
+  grep 0 <(systemctl --user list-units docker.* --all --no-pager) || exit 1
   grep inactive <(grep active <(systemctl --user is-active dbus) || exit 1) && exit 1
 }
 
@@ -748,7 +744,7 @@ env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $ro
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
-BUILDKIT_TTY_LOG_LINES=\$((\$LINES - 15))
+BUILDKIT_TTY_LOG_LINES=\$((\$LINES - 10))
 BUILDX_GIT_LABELS=full
 BUILDX_METADATA_PROVENANCE=max
 BUILDX_METADATA_WARNINGS=1
@@ -773,17 +769,26 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
 --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
-rm -f $rootless_path/env-*; exit \$PIPESTATUS
+rm -f $rootless_path/env-*
 ____EOF
+if [[ "$DEBUG" == *yes* ]]; then echo created: $rootless_path.sh; cat $rootless_path.sh; fi;
 
 cp $systemd_service $sysusr_service && wait && \
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
+if [[ "$DEBUG" == *yes* ]]; then
+  echo modified: $sysusr_service
+  cat $sysusr_service
+  echo original: $systemd_service
+  cat $systemd_service
+  read -p test-here
+fi
 
-sys_ctl_common && systemctl --user start docker.dockerd && sleep 10
-systemctl --user status docker.slice --all --no-pager -l > $rootless_path/docker.slice.log
-systemctl --user status docker.dockerd --all --no-pager -l > $rootless_path/docker.dockerd.log
+sys_ctl_common
+systemctl --user start docker.dockerd && sleep 10
+systemctl --user status docker.slice --all --no-pager -l > $rootless_path/docker.slice.log || true
+systemctl --user status docker.dockerd --all --no-pager -l > $rootless_path/docker.dockerd.log || true
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
