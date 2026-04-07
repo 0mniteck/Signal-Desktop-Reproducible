@@ -771,18 +771,20 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
 rm -f $rootless_path/env-*
 ____EOF
-if [[ "$DEBUG" == *yes* ]]; then echo created: $rootless_path.sh; cat $rootless_path.sh; fi;
+
+if [[ "$DEBUG" == *yes* ]]; then echo created $rootless_path.sh; cat $rootless_path.sh; fi;
 
 cp $systemd_service $sysusr_service && wait && \
 sed -z -i \"s|\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
+
 if [[ "$DEBUG" == *yes* ]]; then
   echo modified: $sysusr_service
   cat $sysusr_service
   echo original: $systemd_service
   cat $systemd_service
-  read -p test-here
+  read -p test_here
 fi
 
 sys_ctl_common
@@ -899,7 +901,7 @@ for pid in \$pids
 do
   while [[ \"\$pid\" -gt 0 && \$(cat <(lsof -F p -p \$pid -R | grep -o \$pid)) == *\$pid* ]]
   do
-    printf \$pid': \$pid still running...'\\n
+    printf \$pid': pid still running...'\\n
     quiet kill \$pid && echo \"Killed pid: \$pid\"
     sleep 0.1
   done
@@ -926,7 +928,7 @@ for pid in $pids
 do
   while [[ "$pid" -gt 0 && $(cat <(lsof -F p -p $pid -R | grep -o $pid)) == *$pid* ]]
   do
-    printf $pid': $pid still running...'\\n
+    printf $pid': pid still running...'\\n
     quiet kill $pid && echo "Killed pid: $pid"
     sleep 0.1
   done
