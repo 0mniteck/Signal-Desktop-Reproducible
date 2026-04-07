@@ -457,7 +457,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf $mk_pid': seen-daemon(seend) still running...\r' && sleep 5
 done && mkdir -p \$seend/slirp4 && \
-printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 created!\"\\n\\n || exit 1
+printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 created!\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -508,7 +508,7 @@ syfted() { # \$1 = name
 }
 
 attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
-  if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
+  if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
     src_att=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     read -p \"🔐 Press enter to start attestation for \$2 \$3\"
     echo -e '\nStarting Syft...\n' && touch .pager1 && tail -f .pager1 & pid_1=\$!
@@ -551,7 +551,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
 }
 
 scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalogers directory', \$3 = platform(amd64 or arm64)
-  if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
+  if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
     src=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
     if [[ \"\$3\" != \"\" ]]; then
       pushd \$3 >> $pushd_log
@@ -631,6 +631,7 @@ subver() {
   sub_ver=\$1
   rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y-00\$sub_ver\")
   date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d-00\$sub_ver\")
+  declare -g -- rel_date; declare -g -- date_rel; 
   echo -e \"Build Subversion: 00\$sub_ver\n\" 
 }
 
@@ -728,6 +729,15 @@ export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
 source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
 echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
+if [[ \"\$rel_ver\" -lt 1 ]]; then
+  wait
+elif [[ \"\$rel_ver\" -gt 1 ]]; then
+  subver \$rel_ver
+else
+  sub_ver=1
+  subver \$sub_ver
+fi
+
 if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results*; mkdir -p $results/{arm64,amd64,source,env,debug}; fi;
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
 touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
@@ -771,7 +781,7 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
 ____EOF
 
-if [[ "$DEBUG" == *yes* ]]; then echo created $rootless_path.sh; cat $rootless_path.sh; fi;
+if [[ \"$DEBUG\" == *yes* ]]; then echo created $rootless_path.sh; cat $rootless_path.sh; fi;
 
 cp $systemd_service $sysusr_service && wait && \
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
@@ -828,7 +838,7 @@ if [[ \"$DEBUG\" == *yes* ]]; then
 fi
 \$POPD && unset id save_id
 
-if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
+if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
@@ -854,15 +864,6 @@ if [[ \"\$TESTS\" != *SKIP_LOGIN* ]]; then
   mv -T $home/$snap_path/.password-store $home/.password-store || exit 1
   mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
-fi
-
-if [[ \"\$rel_ver\" -lt 1 ]]; then
-  wait
-elif [[ \"\$rel_ver\" -gt 1 ]]; then
-  subver \$rel_ver
-else
-  sub_ver=1
-  subver \$sub_ver
 fi
 
 if [[ \"\$CROSS\" == *,* ]]; then
@@ -941,5 +942,4 @@ fi
 
 clean_all || echo "Failed clean_all"
 if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log; fi;
-
 exit 0
