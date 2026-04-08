@@ -402,8 +402,7 @@ GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI
 PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF='\$(<$HOME/.ssh/config)' \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
-seen1=\"$seen\"
-seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
+seen1=\"$seen\"; seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
 seend=\"\$(echo \$(diff <(echo \$seen1 | tr ' ' '\n') <(echo \$seen2 | tr ' ' '\n') || true) | cut -d'>' -f2 | cut -d' ' -f2)\"
 XDG_USR_SESSION=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo \$XDG_USR_SESSION > $docker_data/xs.id
@@ -411,7 +410,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf $mk_pid': seen-daemon(seend) still running...\r'; sleep 5
 done; sleep 1; mkdir -p \$seend/slirp4 && \
-printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 seen.\n\n\" || exit 1
+printf \"Session directory session-\$XDG_USR_SESSION.scope seen.\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -504,12 +503,12 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
 }
 
 ssh_config() {
-  if [[ \"\$SSH_CONF\" != *\$MODULE* ]]; then echo \"
+  if [[ \"\$(echo \$(eval \$SSH_CONFIG) | grep -o $module)\" != *$module* ]]; then echo \"
 Host \$MODULE
   Hostname github.com
   IdentityFile $home/\$IDENTITY_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config; fi;
-  if [[ \"\$SSH_CONF\" != *.pki* ]]; then echo \"
+  if [[ \"\$(echo \$(eval \$SSH_CONFIG) | grep -o pki )\" != *pki* ]]; then echo \"
 Host .pki
   Hostname github.com
   IdentityFile $home/\$PKI_ID_FILE
@@ -669,9 +668,9 @@ sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-ro
 ____EOF
 
 cp $systemd_service $sysusr_service && wait && \
+sed -i \"s|Type.*|Type=exec|\" $sysusr_service && \
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
-sed -i \"s|Type.*|Type=exec|\" $sysusr_service && \
 sed -i \"s|Delegate.*|Delegate=cpu cpuset io memory pids|\" $sysusr_service && \
 sed -i \"s|Syslog.*|SyslogIdentifier=docker.dockerd|\" $sysusr_service && \
 sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker.dockerd.service|\" $sysusr_service && \
@@ -696,7 +695,7 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   rootless='Rootless Docker Started\n'; echo -e \$rootless;
   echo -e \$rootless > $rootless_path/tmp/rootless.status; fi;
 
-\$PUSHD_RESULTS && pushd env >> $pushd_log
+eval \"\$PUSHD_RESULTS && pushd env >> $pushd_log\"
   unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
@@ -779,7 +778,6 @@ for pid in \$pids; do
 
 docker-credential-pass erase &
 ssh-add -D && eval \$(ssh-agent -k)
-
 clean_some || echo \"Failed clean_some\"
 sys_ctl_common || echo \"Failed systemctl_common\""
 
