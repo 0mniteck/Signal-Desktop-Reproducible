@@ -134,10 +134,8 @@ if [[ "${run_id}" == "" ]]; then
     argv_run="exec pkexec --keep-cwd '$0' -e ${id} $PRESERVED"
     if [[ "$(which asciinema)" != "" ]]; then
       mkdir -p $HOME/.casts/$repo
-      exec asciinema rec --overwrite -i 3 -t "$TRIPL" $HOME/.casts/$TRIPL.cast -c "$argv_run"; else $argv_run;
-    fi
-  fi
-fi
+      exec asciinema rec --overwrite -i 3 -t "$TRIPL" $HOME/.casts/$TRIPL.cast -c "$argv_run"; else $argv_run; fi;
+fi; fi;
 
 if [[ "$TEST" == *yes* ]]; then
 cat << __EOF
@@ -255,9 +253,8 @@ systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
   quiet networkctl delete docker0
   quiet networkctl delete tun0
 }
-
-snap_install() { # $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous), $3 = cohort_id
-                 # $4 = --unaliased (optional), $5 = --name=instance_name (optional)
+                 # $1 = snap to install, $2 = mode (--classic,--jailmode,--devmode,--dangerous), $3 = cohort_id,
+snap_install() { # $4 = --unaliased (optional), $5 = --name=instance_name (optional)
   if [[ $(snap debug confinement) == *strict* ]]; then wait; else echo "Strict confinement required!" exit 1; fi;
   unset ch_id name version; name=$(echo $1 | cut -d'.' -f1); ch_id=$(snap install $1 $2 --cohort=$3 $4 $5 --no-wait);
   if [[ "$ch_id" -gt 0 ]]; then snap watch $ch_id; snap debug timings $ch_id > /tmp/snap_ch_id_$ch_id.change;
@@ -309,7 +306,7 @@ plugs="docker-daemon firewall-control network-bind network-control opengl privil
 for plug in $plugs; do
   snap disconnect --forget docker_rootless:$plug >> $nulled && \
   printf "\rRemoving plug docker_rootless:$plug\033[K" || exit 1
-done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | tr ' ' ',' | sed 's/,/,\ /g' )\033[K"\\n
+done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | sed 's/\ /,\ /g' )\033[K"\\n
 unset plugs plug; echo; snap connections; echo
 
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
