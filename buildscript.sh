@@ -83,8 +83,7 @@ test() {
     if [[ "$NO_CLEAN" == "" ]]; then rm -f $nulled $pushd_log /tmp/ch_id_*; fi;
     touch $nulled $pushd_log; > $nulled; > $pushd_log
   fi
-  declare -g -- nulled; declare -g -- pushd_log
-  usage
+  declare -g -- nulled; declare -g -- pushd_log; usage
 }
 
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
@@ -128,7 +127,7 @@ export -- HOME=$run_home \
 TERM=$term PATH=/bin:/sbin:/snap/bin \
 TRIPL=$repo/$module:$real_date
 unset id; id=$(id -u)
-  
+
 if [[ "${run_id}" == "" ]]; then
   if [[ "$(whoami)" == *root* || "${id}" == "0" ]]; then
     echo -e "\nDO NOT run with escalated priviledges!\nScript will Use: ~\$ 'pkexec --keep-cwd $0 $PRESERVED'\n" && exit 1; else
@@ -216,8 +215,7 @@ if [[ "$NO_CLEAN" == "" ]]; then
   /run/containerd/ \
   /run/docker* \
   /run/runc/ \
-  /run/snap.docker*
-fi
+  /run/snap.docker*; fi;
 }
 
 clean_all() {
@@ -231,8 +229,7 @@ if [[ "$NO_CLEAN" == "" ]]; then
   $data_dir/systemd/ \
   $var_docker* \
   /usr/libexec/docker/ \
-  /var/lib/snapd/cache/*
-fi
+  /var/lib/snapd/cache/*; fi;
   clean_most || echo "Failed clean_most"
 }
 
@@ -294,7 +291,7 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     echo "Failed apt install"
 
 if [[ "$NO_CLEAN" == "" ]]; then snap remove docker_rootless \
---purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless"; fi;
+  --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless"; fi;
 snap_install syft --classic $ch_syft || exit 1
 snap_install grype --classic $ch_grype || exit 1
 
@@ -307,17 +304,17 @@ if [[ "$NO_CLEAN" == "" ]]; then rm -f *.assert *.snap; fi;
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
 snap set docker_rootless nvidia-support.disabled=true && echo && \
-printf "Removing feature docker_rootless:nvidia-support"\\r && sleep 2 && \
-printf "\rRemoving feature docker_rootless:cdi\033[K" && sleep 2 && \
-printf "\r\033[K" && printf "\nRemoved features: cdi, nvidia-support\033[K" || \
+printf "\rRemoving feature docker_rootless:nvidia-support\033[K" && sleep 3 && \
+printf "\rRemoving feature docker_rootless:cdi\033[K" && sleep 3 && \
+printf "\rRemoved features: cdi, nvidia-support\033[K"\\n || \
 echo "Failed to disable docker_rootless:nvidia-support"
 
 plugs="docker-daemon firewall-control network-bind network-control opengl privileged support"
 for plug in $plugs; do
   snap disconnect --forget docker_rootless:$plug >> $nulled && \
-  printf "\r\033[K" && printf "Removing plug docker_rootless:"$plug\\r || exit 1
-done && sleep 1 && printf "\r\033[K" && printf "Removed plugs: "$(echo $plugs | tr ' ' ',')\\n
-unset plugs plug && echo && snap connections && echo
+  printf "\rRemoving plug docker_rootless:$plug\033[K" || exit 1
+done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | tr ' ' ', ')\033[K"\\n
+unset plugs plug; echo; snap connections; echo
 
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
@@ -359,7 +356,6 @@ pushd $docker_data >> $pushd_log
     for debugger in \
 {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
       echo "---------------snap-$debugger---------------" >> snap.info; quiet "snap $debugger >> snap.info"; done; unset debugger
-
     states=$(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
     if [[ "$((${#states[0]}/2))" -ge 100 || "$DEBUG" == *no* ]]; then
       unset states; echo "Too many change ID's, start from a clean snapd install to run debugger"; fi;
@@ -373,10 +369,10 @@ pushd $docker_data >> $pushd_log
       echo "------------debug-state-timings-$state-------------" >> snap.events
       quiet "snap debug timings $state >> snap.events"
     done; unset states state; printf 'Saved debugger info     '\\n\\n
-  fi
+    cat /tmp/snap_ch_id_* >> snap.install; rm -f /tmp/snap_ch_id_*
+  fi;
   id=$(id -u); save_id=$id:$id.env
   set > $save_id; env | sort >> $save_id; declare >> $save_id
-  cat /tmp/snap_ch_id_* >> snap.install; rm -f /tmp/snap_ch_id_*
   chown --quiet $run_as:$run_as $save_id snap.{info,install,events} || true
 popd -- >> $pushd_log && unset debugger states state id save_id
 
@@ -429,8 +425,8 @@ XDG_USR_SESSION=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
-  printf $mk_pid': seen-daemon(seend) still running...\r' && sleep 5
-done && mkdir -p \$seend/slirp4 && \
+  printf $mk_pid': seen-daemon(seend) still running...\r'; sleep 5
+done; sleep 1; mkdir -p \$seend/slirp4 && \
 printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 seen.\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
@@ -760,9 +756,10 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   echo -e '\nBuildx Inspect:\n' >> docker.info
   quiet '$docker buildx inspect --bootstrap >> docker.info'
   \$POPD; if [[ \"$DEBUG\" == *yes* ]]; then
-    pushd debug >> $pushd_log
-      mv $docker_data/snap.{info,install,events} .
-    \$POPD; fi; \$POPD; unset id save_id
+  pushd debug >> $pushd_log
+    mv $docker_data/snap.{info,install,events} .
+  \$POPD; fi;
+\$POPD; unset id save_id;
 
 if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
@@ -801,7 +798,6 @@ fi
 
 if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" != *no* ]]; then
   source modules || drop_down || exit \$PIPESTATUS
-
   \$PUSHD_RESULTS
     scan_using_grype ubuntu \"/ --select-catalogers directory\"
     touch readme.md && > readme.md && cat */*.vulns >> readme.md
@@ -809,7 +805,6 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" != *no* ]]; then
     echo '\`\`\`' >> readme.md && cat *.index.ref >> readme.md
     cat */*.manifest.ref >> readme.md && cat readme.md && echo
   \$POPD
-
   git status && git add -A && git status && confirm 'git commit - git@ssh'
   if [[ \"\$BRANCH\" != \"\" ]]; then
     git commit -a -S -m \"$COMMIT \$date_rel\" && \
@@ -818,7 +813,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" != *no* ]]; then
       git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && \
       git push origin \"refs/tags/\$TAG\"
     fi; fi; else drop_down || echo \$PIPESTATUS
-fi
+fi;
 
 pids=\"\$pid_1 \$pid_2 \$pid_3\"
 for pid in \$pids; do
@@ -826,8 +821,8 @@ for pid in \$pids; do
     printf \$pid': pid still running...\n'
     quiet kill \$pid && echo \"Killed pid: \$pid\"
     sleep 0.1
-  done && sleep 0.1
-done && unset pid pids pid_1 pid_2 pid_3
+  done; sleep 0.1
+done; unset pid pids pid_1 pid_2 pid_3
 
 docker-credential-pass erase &
 ssh-add -D && eval \$(ssh-agent -k)
@@ -842,11 +837,11 @@ if [[ -d $home/$snap_path ]]; then declare -- dir_pid="$(cat <(lsof -F p $home/$
 pids="$pid_0 $mk_pid $dir_pid $lsof_d"
 for pid in $pids; do
   while [[ $(cat <(lsof -F p -p $pid -R | grep -o $pid)) == *$pid* ]]; do
-    printf $pid': pid still running...'\\n
+    printf $pid": pid still running..."\\n
     quiet kill $pid && echo "Killed pid: $pid"
     sleep 0.1
-  done && sleep 0.1
-done && unset pid pids pid_0 mk_pid dir_pid lsof_d
+  done; sleep 0.1
+done; unset pid pids pid_0 mk_pid dir_pid lsof_d
 
 clean_all || echo "Failed clean_all"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
