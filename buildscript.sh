@@ -15,7 +15,7 @@ General Usage:
 
   Requirements:
         1. Ubuntu 25.10+ (arm64 or amd64)
-        2. .dotfiles (./.pinned_ver and ./.identity)
+        2. .dotfiles (./.pinned_ver, ./.rego, and ./.identity)
 
   Options:
         [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
@@ -306,15 +306,18 @@ snap_install docker_rootless.snap --jailmode $ch_docker --unaliased --name=docke
 if [[ "$NO_CLEAN" == "" ]]; then rm -f *.assert *.snap; fi;
 
 snap set docker_rootless nvidia-support.runtime.config-override="" && \
-snap set docker_rootless nvidia-support.disabled=true && \
-echo -e "\nRemoving feature docker_rootless:nvidia-support\nRemoving feature docker_rootless:cdi" || \
+snap set docker_rootless nvidia-support.disabled=true && echo && \
+printf "Removing feature docker_rootless:nvidia-support"\\r && sleep 2 && \
+printf "\rRemoving feature docker_rootless:cdi\033[K" && sleep 2 && \
+printf "\r\033[K" && printf "\nRemoved features: cdi, nvidia-support\033[K" || \
 echo "Failed to disable docker_rootless:nvidia-support"
 
 plugs="docker-daemon firewall-control network-bind network-control opengl privileged support"
 for plug in $plugs; do
   snap disconnect --forget docker_rootless:$plug >> $nulled && \
-  echo "Removing plug docker_rootless:"$plug || exit 1
-done && unset plugs plug && sleep 1 && echo
+  printf "\r\033[K" && printf "Removing plug docker_rootless:"$plug\\r || exit 1
+done && sleep 1 && printf "\r\033[K" && printf "Removed plugs: "$(echo $plugs | tr ' ' ',')\\n
+unset plugs plug && echo && snap connections && echo
 
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
@@ -334,9 +337,8 @@ if [[ "$TESTS" != *SKIP_LOGIN* ]]; then
     sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" $sc_rules
     udevadm control --reload-rules && udevadm trigger
   fi
-
-  while [[ "$(lsusb -d 1050: | grep Yubikey)" != *Yubikey* ]]; do printf "\r🔐 Please insert yubikey - (CCID)\033[K"; done; sleep 1; echo
-
+  while [[ "$(lsusb -d 1050: | grep Yubikey)" != *Yubikey* ]]; do
+    printf "\r🔐 Please insert yubikey - (CCID)\033[K"; done; sleep 1; echo
   quiet chown $run_as:$run_as /dev/hidraw*
   BUS=$(lsusb -d 1050: | grep -o Bus.... - | grep -o [0-9][0-9][0-9])
   DEVICE=$(lsusb -d 1050: | grep -o Device.... - | grep -o [0-9][0-9][0-9])
@@ -351,10 +353,9 @@ if [[ "$MOUNT" != "" ]]; then
   chown $run_as:$run_as $docker_data
 fi
 
-if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
-  pushd $docker_data >> $pushd_log
+pushd $docker_data >> $pushd_log
+  if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
     printf 'Saving debugger info...'\\r; unset debugger states state id save_id; > snap.info; > snap.install; > snap.events
-
     for debugger in \
 {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
       echo "---------------snap-$debugger---------------" >> snap.info; quiet "snap $debugger >> snap.info"; done; unset debugger
@@ -362,7 +363,6 @@ if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
     states=$(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
     if [[ "$((${#states[0]}/2))" -ge 100 || "$DEBUG" == *no* ]]; then
       unset states; echo "Too many change ID's, start from a clean snapd install to run debugger"; fi;
-
     for state in $states; do
       echo "-------------debug-state-change-$state-------------" >> snap.events
       quiet "snap debug state --abs-time --change=$state /var/lib/snapd/state.json >> snap.events"
@@ -372,17 +372,13 @@ if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
       quiet "snap tasks $state --abs-time >> snap.events"
       echo "------------debug-state-timings-$state-------------" >> snap.events
       quiet "snap debug timings $state >> snap.events"
-    done && unset states state
-
-    id=$(id -u); save_id=$id:$id.env
-    set > $save_id; env | sort >> $save_id
-    declare >> $save_id
-    
-    cat /tmp/snap_ch_id_* >> snap.install; rm -f /tmp/snap_ch_id_*
-    chown $run_as:$run_as $save_id snap.{info,install,events}
-    printf 'Saved debugger info     '\\n\\n
-  popd -- >> $pushd_log && unset debugger states state id save_id
-fi
+    done; unset states state; printf 'Saved debugger info     '\\n\\n
+  fi
+  id=$(id -u); save_id=$id:$id.env
+  set > $save_id; env | sort >> $save_id; declare >> $save_id
+  cat /tmp/snap_ch_id_* >> snap.install; rm -f /tmp/snap_ch_id_*
+  chown --quiet $run_as:$run_as $save_id snap.{info,install,events} || true
+popd -- >> $pushd_log && unset debugger states state id save_id
 
 if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
@@ -435,7 +431,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf $mk_pid': seen-daemon(seend) still running...\r' && sleep 5
 done && mkdir -p \$seend/slirp4 && \
-printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 seen\!\n\n\" || exit 1
+printf \"Session directory session-\$XDG_USR_SESSION.scope/slirp4 seen.\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
@@ -562,6 +558,7 @@ sys_ctl_common() {
   systemctl --user stop docker.* --all && wait
   grep 0 <(systemctl --user list-units docker.* --all --no-pager) || echo F1
   grep inactive <(grep active <(systemctl --user is-active dbus) || echo F2) && echo F3
+  return 0
 }
 
 subver() {
@@ -667,13 +664,13 @@ rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=\\ \$date_rel | wc -l)
 
-export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
-source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
-echo -e \"Setting rel_date from today's date: \$rel_date\n\"
-
 if [[ \"\$rel_ver\" -lt 1 ]]; then wait;
 elif [[ \"\$rel_ver\" -gt 1 ]]; then subver \$rel_ver;
 else sub_ver=1; subver \$sub_ver; fi;
+
+export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
+source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
+echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
 if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results*; mkdir -p $results/{arm64,amd64,source,env,debug}; fi;
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
@@ -737,8 +734,7 @@ if [[ \"$DEBUG\" == *yes* ]]; then
   read -p test_here
 fi
 
-sys_ctl_common || echo \"Failed systemctl_common\"
-systemctl --user start docker.dockerd && sleep 10
+sys_ctl_common || true; systemctl --user start docker.dockerd; sleep 10
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
