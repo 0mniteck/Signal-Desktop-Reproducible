@@ -309,7 +309,7 @@ plugs="docker-daemon firewall-control network-bind network-control opengl privil
 for plug in $plugs; do
   snap disconnect --forget docker_rootless:$plug >> $nulled && \
   printf "\rRemoving plug docker_rootless:$plug\033[K" || exit 1
-done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | tr ' ' ', ')\033[K"\\n
+done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | tr ' ' ',' | sed 's/,/,\ /g' )\033[K"\\n
 unset plugs plug; echo; snap connections; echo
 
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
