@@ -82,8 +82,7 @@ test() {
   if [[ "$RUNME" != "" ]]; then
     if [[ "$NO_CLEAN" == "" ]]; then rm -f $nulled $pushd_log /tmp/ch_id_*; fi;
     touch $nulled $pushd_log; > $nulled; > $pushd_log
-  fi
-  declare -g -- nulled; declare -g -- pushd_log; usage
+  fi; declare -g -- nulled; declare -g -- pushd_log; usage
 }
 
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
@@ -238,8 +237,7 @@ unmount() {
   if [[ -d $docker_data ]]; then
     lsof_d="$(cat <(lsof -F p $docker_data | cut -d'p' -f2 || true))"
     for l in $lsof_d; do quiet kill $l; done; unset l
-    if [[ "$NO_CLEAN" == "" ]]; then rm -r -f $docker_data/*; sync; fi;
-  fi
+    if [[ "$NO_CLEAN" == "" ]]; then rm -r -f $docker_data/*; sync; fi; fi;
   quiet umount $docker_data && sleep 1
   quiet systemd-cryptsetup detach $module && sleep 1
   quiet dmsetup remove /dev/mapper/$module && sleep 1
@@ -281,7 +279,6 @@ quiet() {
 }
 
 if [[ "$MOUNT" != "" ]]; then unmount; fi; clean_all || echo "Failed clean_all"
-
 apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ fuse-overlayfs+ gh+ git-lfs+ \
                                                                     gnupg2+ gpg-agent+ iptables+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
@@ -289,14 +286,13 @@ apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cos
                                                                     uidmap+ golang-github*- golang-docker*- \
                                                                     docker- docker.io- docker-ce- docker-ce-cli- podman*- || \
                                                                     echo "Failed apt install"
-
 if [[ "$NO_CLEAN" == "" ]]; then snap remove docker_rootless \
   --purge --terminate 2>> $nulled && wait || echo "Failed to remove Docker Rootless"; fi;
 snap_install syft --classic $ch_syft || exit 1
 snap_install grype --classic $ch_grype || exit 1
 
 snap set system experimental.parallel-instances=true && \
-printf 'Fetching snap "docker_rootless"'\\r && \
+printf '\rFetching snap "docker_rootless"\033[K' && \
 snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled && \
 snap ack docker_rootless.assert || exit 1
 snap_install docker_rootless.snap --jailmode $ch_docker --unaliased --name=docker_rootless || exit 1
@@ -332,8 +328,7 @@ ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled
 if [[ "$TESTS" != *SKIP_LOGIN* ]]; then
   if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
     sed -i.backup "s/\"1050\", ATTR{idProduct}==\"040.\", /&MODE=\"0660\", GROUP=\"$run_as\", /g" $sc_rules
-    udevadm control --reload-rules && udevadm trigger
-  fi
+    udevadm control --reload-rules && udevadm trigger; fi;
   while [[ "$(lsusb -d 1050: | grep Yubikey)" != *Yubikey* ]]; do
     printf "\r🔐 Please insert yubikey - (CCID)\033[K"; done; sleep 1; echo
   quiet chown $run_as:$run_as /dev/hidraw*
@@ -352,7 +347,7 @@ fi
 
 pushd $docker_data >> $pushd_log
   if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
-    printf 'Saving debugger info...'\\r; unset debugger states state id save_id; > snap.info; > snap.install; > snap.events
+    printf '\rSaving debugger info...\033[K'; unset debugger states state id save_id; > snap.info; > snap.install; > snap.events
     for debugger in \
 {"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
       echo "---------------snap-$debugger---------------" >> snap.info; quiet "snap $debugger >> snap.info"; done; unset debugger
@@ -368,13 +363,12 @@ pushd $docker_data >> $pushd_log
       quiet "snap tasks $state --abs-time >> snap.events"
       echo "------------debug-state-timings-$state-------------" >> snap.events
       quiet "snap debug timings $state >> snap.events"
-    done; unset states state; printf 'Saved debugger info     '\\n\\n
+    done; unset states state; printf '\rSaved debugger info\033[K'\\n\\n
     cat /tmp/snap_ch_id_* >> snap.install; rm -f /tmp/snap_ch_id_*
-  fi;
-  id=$(id -u); save_id=$id:$id.env
+  fi; id=$(id -u); save_id=$id:$id.env
   set > $save_id; env | sort >> $save_id; declare >> $save_id
   chown --quiet $run_as:$run_as $save_id snap.{info,install,events} || true
-popd -- >> $pushd_log && unset debugger states state id save_id
+popd -- >> $pushd_log; unset debugger states state id save_id
 
 if [[ "$TEST" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
@@ -385,18 +379,11 @@ if [[ "$TEST" == *yes* ]]; then
   SYSTEMD_LOG_TARGET=console SYSTEMD_URLIFY=false
   debug_cat="journalctl --output=cat --identifier=USR_RNLVL --follow"
   systemd_cat="systemd-cat --identifier=USR_RNLVL --priority=debug"
-else
-  push="--push"
-  declare -- PUSH="$push"
-fi
+else push="--push"; declare -- PUSH="$push"; fi;
 
 if [[ "$CROSS" == "yes" ]]; then
-  DOUBLE="--platform linux/arm64,linux/amd64"
-  declare -- CROSS="$DOUBLE"
-else
-  SINGLE="--platform linux/$ANAME"
-  declare -- CROSS="$SINGLE"
-fi
+  DOUBLE="--platform linux/arm64,linux/amd64"; declare -- CROSS="$DOUBLE"; else
+  SINGLE="--platform linux/$ANAME"; declare -- CROSS="$SINGLE"; fi;
 
 wait1="while [[ -d $docker_data/ && ! -f $docker_data/xs.id ]]; do wait; done;"
 wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
@@ -464,8 +451,7 @@ syfted() { # \$1 = name
 }
 
 attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platform linux/amd64,linux/arm64)
-  if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
-    src_att=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\"
+  if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then src_att=\"--source-name \$1 --source-supplier \$USERNAME --source-version \$(date +%s)\";
     read -p \"🔐 Press enter to start attestation for \$2 \$3\"
     echo -e '\nStarting Syft...\n' && touch .pager1 && tail -f .pager1 & pid_1=\$!
     syft_att_run=\"script -q -c 'TMPDIR=$docker_data/syft syft attest --output spdx-json docker.io/\$2 \
@@ -487,7 +473,6 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     
     if [[ \"\$digest1\" == \"\$att1\" ]]; then echo docker.io/\$2@\$digest1 > \$arr1/\$1.manifest.ref; fi;
     if [[ \"\$digest2\" == \"\$att2\" ]]; then echo docker.io/\$2@\$digest2 > \$arr2/\$1.manifest.ref; fi;
-
     for arr in \$arr1 \$arr2; do echo 'Starting Cosign...'; pushd \$arr >> $pushd_log
       cosign_run=\"script -q -c 'cosign verify-attestation \$(cat \$1.manifest.ref) \
         --certificate-oidc-issuer https://github.com/login/oauth \
@@ -522,20 +507,16 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
 }
 
 ssh_config() {
-  if [[ \"\$SSH_CONF\" != *\$MODULE* ]]; then
-    echo \"
+  if [[ \"\$SSH_CONF\" != *\$MODULE* ]]; then echo \"
 Host \$MODULE
   Hostname github.com
   IdentityFile $home/\$IDENTITY_FILE
-  IdentitiesOnly yes\" >> $home/.ssh/config
-  fi
-  if [[ \"\$SSH_CONF\" != *.pki* ]]; then
-    echo \"
+  IdentitiesOnly yes\" >> $home/.ssh/config; fi;
+  if [[ \"\$SSH_CONF\" != *.pki* ]]; then echo \"
 Host .pki
   Hostname github.com
   IdentityFile $home/\$PKI_ID_FILE
-  IdentitiesOnly yes\" >> $home/.ssh/config
-  fi
+  IdentitiesOnly yes\" >> $home/.ssh/config; fi;
 }
 
 drop_down() {
@@ -553,8 +534,7 @@ sys_ctl_common() {
   systemctl --user start dbus && wait
   systemctl --user stop docker.* --all && wait
   grep 0 <(systemctl --user list-units docker.* --all --no-pager) || echo F1
-  grep inactive <(grep active <(systemctl --user is-active dbus) || echo F2) && echo F3
-  return 0
+  grep inactive <(grep active <(systemctl --user is-active dbus) || echo F2) && echo F3; return 0
 }
 
 subver() {
@@ -576,15 +556,12 @@ if [[ \"$NO_CLEAN\" == \"\" ]]; then
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
   ./.pki/local.sh \$1 \$CLIENT_ID || exit 1
 }
-
 docker() {
   echd=\"\$@\"; $docker \$echd
 }
-
 quiet() {
   echq=\"\$@\"; script -a -q -c \"\$echq\" $nulled >> $nulled
 }
-
 confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
@@ -609,11 +586,8 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
 
   echo && confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
-  if [[ ! -d \".pki\" ]]; then
-    mkdir -p .pki && git submodule add git@.pki:\$REPO/.pki.git
-  else
-    git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"
-  fi
+  if [[ ! -d \".pki\" ]]; then mkdir -p .pki; git submodule add git@.pki:\$REPO/.pki.git;
+  else git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"; fi;
   git submodule update --init --remote --merge
 
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* && \"$DEBUG\" != *no* ]]; then
@@ -625,41 +599,27 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
     echo -e '\nCheck Yubikey and .identity file\n'
     lsusb && ls -la /dev/hid* && gpg-card list - openpgp
     systemctl --user status gpg-agent* --all --no-pager
-    ls -la $home/.gnupg $home/.password-store
-    exit 1
-  fi
-fi
+    ls -la $home/.gnupg $home/.password-store; exit 1
+fi; fi;
 
 unset source_date_epoch
-if [[ \"\$EPOCH\" == *today* ]]; then
-  timestamp=\$(date -d \$(date +%D) +%s);
+if [[ \"\$EPOCH\" == *today* ]]; then timestamp=\$(date -d \$(date +%D) +%s);
   if [[ \"\$timestamp\" != \"\" ]]; then
     echo \"Setting SOURCE_DATE_EPOCH from today's date: \$(date +%D) = @\$timestamp\";
-    source_date_epoch=\$((timestamp));
-  else
-    echo \"Can't get timestamp. Defaulting to 1.\";
-    source_date_epoch=1;
-  fi
-elif [[ \"\$EPOCH\" != 0 ]]; then
-  echo \"Using override timestamp \$EPOCH for SOURCE_DATE_EPOCH.\"
-  source_date_epoch=\$((\$EPOCH))
-else
-  timestamp=\$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)
-  if [[ \"\$timestamp\" != \"\" ]]; then
-    echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\"
+    source_date_epoch=\$((timestamp)); else echo \"Can't get timestamp. Defaulting to 1.\";
+    source_date_epoch=1; fi;
+elif [[ \"\$EPOCH\" != 0 ]]; then echo \"Using override timestamp \$EPOCH for SOURCE_DATE_EPOCH.\";
+  source_date_epoch=\$((\$EPOCH)); else timestamp=\$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5);
+  if [[ \"\$timestamp\" != \"\" ]]; then echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \
+\$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\";
     cp $results/release.sha512sum /tmp/release.last.sha512sum && check_file=yes || exit 1
-    source_date_epoch=\$((timestamp))
-  else
-    echo \"Can't get latest commit timestamp. Defaulting to 1.\"
-    source_date_epoch=1
-  fi
-fi
+    source_date_epoch=\$((timestamp)); else echo \"Can't get latest commit timestamp. Defaulting to 1.\";
+    source_date_epoch=1; fi; fi;
 
 unset rel_date date_rel rel_ver sub_ver
 rel_date=\$(date -d \"\$(date)\" +\"%m-%d-%Y\")
 date_rel=\$(date -d \"\$(date)\" +\"%Y-%m-%d\")
 rel_ver=\$(git log --pretty=reference --grep=\\ \$date_rel | wc -l)
-
 if [[ \"\$rel_ver\" -lt 1 ]]; then wait;
 elif [[ \"\$rel_ver\" -gt 1 ]]; then subver \$rel_ver;
 else sub_ver=1; subver \$sub_ver; fi;
@@ -727,10 +687,9 @@ if [[ \"$DEBUG\" == *yes* ]]; then
   cat $sysusr_service
   echo original: $systemd_service
   cat $systemd_service
-  read -p test_here
-fi
+  read -p test_here; fi;
 
-sys_ctl_common || true; systemctl --user start docker.dockerd; sleep 10
+sys_ctl_common || true; systemctl --user start docker.dockerd; sleep 10;
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
 quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
@@ -745,8 +704,8 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
   mv $docker_data/0:0.env .
-
   cp $rootless_path/env-docker docker.env
+
   echo -e '\nDocker Version:\n' > docker.info
   quiet '$docker version >> docker.info'
   echo -e '\nDocker Info:\n' >> docker.info
@@ -818,11 +777,8 @@ fi;
 pids=\"\$pid_1 \$pid_2 \$pid_3\"
 for pid in \$pids; do
   while [[ \$(cat <(lsof -F p -p \$pid -R | grep -o \$pid)) == *\$pid* ]]; do
-    printf \$pid': pid still running...\n'
-    quiet kill \$pid && echo \"Killed pid: \$pid\"
-    sleep 0.1
-  done; sleep 0.1
-done; unset pid pids pid_1 pid_2 pid_3
+    printf \$pid': pid still running...\n'; quiet kill \$pid && echo 'Killed pid: '\$pid; sleep 0.1;
+  done; sleep 0.1; done; unset pid pids pid_1 pid_2 pid_3
 
 docker-credential-pass erase &
 ssh-add -D && eval \$(ssh-agent -k)
@@ -837,11 +793,8 @@ if [[ -d $home/$snap_path ]]; then declare -- dir_pid="$(cat <(lsof -F p $home/$
 pids="$pid_0 $mk_pid $dir_pid $lsof_d"
 for pid in $pids; do
   while [[ $(cat <(lsof -F p -p $pid -R | grep -o $pid)) == *$pid* ]]; do
-    printf $pid": pid still running..."\\n
-    quiet kill $pid && echo "Killed pid: $pid"
-    sleep 0.1
-  done; sleep 0.1
-done; unset pid pids pid_0 mk_pid dir_pid lsof_d
+    printf $pid': pid still running...'\\n; quiet kill $pid; echo 'Killed pid: '$pid; sleep 0.1;
+  done; sleep 0.1; done; unset pid pids pid_0 mk_pid dir_pid lsof_d
 
 clean_all || echo "Failed clean_all"
 sed -i "s|:/home/root:|:/root:|" /etc/passwd
@@ -851,10 +804,7 @@ if [[ "$NO_CLEAN" == "" ]]; then
   snap remove syft --purge --terminate
   snap remove grype --purge --terminate
   snap remove docker_rootless --purge --terminate 2>> $nulled && sleep 1
-  snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker Rootless"
-fi
+  snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker Rootless"; fi;
 
 clean_all || echo "Failed clean_all"
-if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log; fi;
-
-exit 0
+if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log; fi; exit 0
