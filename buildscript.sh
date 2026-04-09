@@ -408,9 +408,9 @@ XDG_USR_SESSION=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
-  printf $mk_pid': seen-daemon(seend) still running...\r'; sleep 5
+  printf \\r$mk_pid': seen-daemon(seend) still running...\033[K'; sleep 5
 done; sleep 1; mkdir -p \$seend/slirp4 && \
-printf \"Session directory session-\$XDG_USR_SESSION.scope seen.\n\n\" || exit 1
+printf \"Session directory session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
