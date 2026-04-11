@@ -157,8 +157,8 @@ elif [[ "$(uname -m)" == "x86_64" ]]; then docker_snap_ver=$amd64_ver; uname=x86
   echo 'Unknown Architecture '$(uname -m); exit 1; fi;
 
 home=$HOME; path=$PATH; term=$TERM; results=results
-pushd_results="pushd $results >> $pushd_log"
-popd="popd -- >> $pushd_log"
+pushd_results="pushd $results \>\> $pushd_log"
+popd="popd \-\- \>\> $pushd_log"
 POPD="$popd"; RESULTS=$results
 PUSHD_RESULTS="$pushd_results"
 PUSHD_LOG=$pushd_log; RUN_DIR=$run_dir
@@ -695,7 +695,8 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   rootless='Rootless Docker Started\n'; echo -e \$rootless;
   echo -e \$rootless > $rootless_path/tmp/rootless.status; fi;
 
-eval \"\$PUSHD_RESULTS && pushd env >> $pushd_log\"
+eval \"\$PUSHD_RESULTS\"
+pushd env >> $pushd_log
   unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
