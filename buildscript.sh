@@ -157,8 +157,8 @@ elif [[ "$(uname -m)" == "x86_64" ]]; then docker_snap_ver=$amd64_ver; uname=x86
   echo 'Unknown Architecture '$(uname -m); exit 1; fi;
 
 home=$HOME; path=$PATH; term=$TERM; results=results
-pushd_results="pushd $results \>\> $pushd_log"
-popd="popd \-\- \>\> $pushd_log"
+pushd_results="pushd $results >> $pushd_log"
+popd="popd -- >> $pushd_log"
 POPD="$popd"; RESULTS=$results
 PUSHD_RESULTS="$pushd_results"
 PUSHD_LOG=$pushd_log; RUN_DIR=$run_dir
@@ -410,7 +410,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf \"\r$mk_pid: seen-daemon(seend) still running...\033[K\"; sleep 5
 done; sleep 1; mkdir -p \$seend/slirp4 && \
-printf \"\rSession directory session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
+printf \"\rSession directory for session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
