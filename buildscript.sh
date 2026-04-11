@@ -307,7 +307,7 @@ for plug in $plugs; do
   snap disconnect --forget docker_rootless:$plug >> $nulled && \
   printf "\rRemoving plug docker_rootless:$plug\033[K" || exit 1
 done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | sed 's/\ /,\ /g' )\033[K"\\n
-unset plugs plug; echo; snap connections; echo
+unset plugs plug; echo;
 
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
@@ -346,7 +346,7 @@ pushd $docker_data >> $pushd_log
   if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
     printf '\rSaving debugger info...\033[K'; unset debugger states state id save_id; > snap.info; > snap.install; > snap.events
     for debugger in \
-{"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
+{connections,"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
       echo "---------------snap-$debugger---------------" >> snap.info; quiet "snap $debugger >> snap.info"; done; unset debugger
     states=$(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
     if [[ "$((${#states[0]}/2))" -ge 100 || "$DEBUG" == *no* ]]; then
@@ -408,9 +408,9 @@ XDG_USR_SESSION=\"\$(echo \$seend | cut -d'-' -f3 | cut -d'.' -f1)\"
 echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
-  printf \\r$mk_pid': seen-daemon(seend) still running...\033[K'; sleep 5
+  printf \"\r$mk_pid: seen-daemon(seend) still running...\033[K\"; sleep 5
 done; sleep 1; mkdir -p \$seend/slirp4 && \
-printf \"Session directory session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
+printf \"\rSession directory session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
 systemctl --user restart gpg-agent.service && wait
