@@ -159,8 +159,8 @@ elif [[ "$(uname -m)" == "x86_64" ]]; then docker_snap_ver=$amd64_ver; uname=x86
 home=$HOME; path=$PATH; term=$TERM; results=results
 pushd_results="pushd $results >> $pushd_log"
 popd="popd -- >> $pushd_log"
-POPD=$popd; RESULTS=$results
-PUSHD_RESULTS=$pushd_results
+POPD="$popd"; RESULTS=$results
+PUSHD_RESULTS="$pushd_results"
 PUSHD_LOG=$pushd_log; RUN_DIR=$run_dir
 no_ai="$(sed -n 2p $0)"; NO_AI=$no_ai
 oci=org.opencontainers.image; OCI=$oci
