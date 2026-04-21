@@ -312,6 +312,8 @@ unset plugs plug; echo;
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed clean_most"
+update-alternatives --remove-all docker
+update-alternatives --install /usr/bin/docker docker $docker 50
 
 # if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
 echo 'options overlay metacopy=on' > /etc/modprobe.d/metacopy.conf
@@ -519,8 +521,7 @@ drop_down() {
   set +xv; read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
   /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; export -- HOME=$HOME PATH=\$PATH TERM=$TERM; \
   echo source .identity; echo source .pinned_ver; echo source $rootless_path/tmp/env-rootless.exp; \
-  echo 'docker() { echd=\"\$@\"; $docker \$echd; }'; echo \"echo -e '\nDropped down to interactive shell. \
-  Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
+  echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
   PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'; BUILDKIT_PROGRESS=plain;\"); $debug
 }
 
@@ -552,12 +553,11 @@ if [[ \"$NO_CLEAN\" == \"\" ]]; then
 validate.with.pki() { # \$1 = full_url.TDL/.../[file]
   ./.pki/local.sh \$1 \$CLIENT_ID || exit 1
 }
-docker() {
-  echd=\"\$@\"; $docker \$echd
-}
+
 quiet() {
   echq=\"\$@\"; script -a -q -c \"\$echq\" $nulled >> $nulled
 }
+
 confirm() { # \$1 = subject
   read -p \"Press enter then 👆 please confirm presence on security token for \$1.\"
 }
@@ -688,7 +688,7 @@ if [[ \"$DEBUG\" == *yes* ]]; then
 sys_ctl_common || true; systemctl --user start docker.dockerd; sleep 10;
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
 source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
-quiet \"$docker info | grep rootless > $rootless_path/tmp/rootless.status\"
+quiet \"docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
   echo -e 'Rootless Docker Failed\n'; exit 1; else
@@ -704,13 +704,13 @@ pushd env >> $pushd_log
   cp $rootless_path/env-docker docker.env
 
   echo -e '\nDocker Version:\n' > docker.info
-  quiet '$docker version >> docker.info'
+  quiet 'docker version >> docker.info'
   echo -e '\nDocker Info:\n' >> docker.info
-  quiet '$docker info >> docker.info'
+  quiet 'docker info >> docker.info'
   echo -e '\nBuildx Version:\n' >> docker.info
-  quiet '$docker buildx version >> docker.info'
+  quiet 'docker buildx version >> docker.info'
   echo -e '\nBuildx Inspect:\n' >> docker.info
-  quiet '$docker buildx inspect --bootstrap >> docker.info'
+  quiet 'docker buildx inspect --bootstrap >> docker.info'
   \$POPD; if [[ \"$DEBUG\" == *yes* ]]; then
   pushd debug >> $pushd_log
     mv $docker_data/snap.{info,install,events} .
@@ -802,5 +802,6 @@ if [[ "$NO_CLEAN" == "" ]]; then
   snap remove docker_rootless --purge --terminate 2>> $nulled && sleep 1
   snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker Rootless"; fi;
 
+update-alternatives --remove-all docker
 clean_all || echo "Failed clean_all"
 if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log; fi; exit 0
