@@ -312,7 +312,7 @@ unset plugs plug; echo;
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed clean_most"
-update-alternatives --remove-all docker
+update-alternatives --remove-all docker 2> $nulled || true
 update-alternatives --install /usr/bin/docker docker $docker 50
 
 # if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
@@ -802,6 +802,6 @@ if [[ "$NO_CLEAN" == "" ]]; then
   snap remove docker_rootless --purge --terminate 2>> $nulled && sleep 1
   snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker Rootless"; fi;
 
-update-alternatives --remove-all docker
+update-alternatives --remove-all docker 2> $nulled || true
 clean_all || echo "Failed clean_all"
 if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log; fi; exit 0
