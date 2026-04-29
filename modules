@@ -34,11 +34,6 @@ $PUSHD_RESULTS
   cat source.attested && echo && $POPD
 $POPD
 
-docker buildx create \
-  --name $MODULE-builder $CROSS --buildkitd-flags "--oci-worker-rootless=true" \
-  --driver docker-container --driver-opt "cgroup-parent=docker.slice,network=host,\
-default-load=true,image=$moby" --bootstrap --use || return 78
-
 if [[ "$last_rel_date" != "$rel_date" ]]; then
   sed -i s/last_epoch=$last_epoch/last_epoch=$sde/g .pinned_ver
   sed -i s/last_rel_date=$last_rel_date/last_rel_date=$rel_date/g .pinned_ver
