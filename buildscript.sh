@@ -88,7 +88,7 @@ test() {
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   debug="set -eo pipefail"
   nulled=/dev/null
-  pushd_log=$nulled
+  pushd_log=/dev/null
   TEST="no"
 elif [[ "$TEST" != *yes* ]]; then
   debug="set -vxeo pipefail"
@@ -157,10 +157,10 @@ elif [[ "$(uname -m)" == "x86_64" ]]; then docker_snap_ver=$amd64_ver; uname=x86
   echo 'Unknown Architecture '$(uname -m); exit 1; fi;
 
 home=$HOME; path=$PATH; term=$TERM; results=results
-pushd_results="pushd $results >> $pushd_log"
-popd="popd -- >> $pushd_log"
-POPD="$popd"; RESULTS=$results
-PUSHD_RESULTS="$pushd_results"
+pushd_results=$(echo "pushd $results >> $pushd_log")
+popd=$(echo "popd -- >> $pushd_log")
+POPD=$(echo "popd -- >> $pushd_log"); RESULTS=$results
+PUSHD_RESULTS=$(echo "pushd $results >> $pushd_log")
 PUSHD_LOG=$pushd_log; RUN_DIR=$run_dir
 no_ai="$(sed -n 2p $0)"; NO_AI=$no_ai
 oci=org.opencontainers.image; OCI=$oci
@@ -711,11 +711,11 @@ pushd env >> $pushd_log
   quiet 'docker buildx version >> docker.info'
   echo -e '\nBuildx Inspect:\n' >> docker.info
   quiet 'docker buildx inspect --bootstrap >> docker.info'
-  \$POPD; if [[ \"$DEBUG\" == *yes* ]]; then
+  $popd; if [[ \"$DEBUG\" == *yes* ]]; then
   pushd debug >> $pushd_log
     mv $docker_data/snap.{info,install,events} .
-  \$POPD; fi;
-\$POPD; unset id save_id;
+  $popd; fi;
+$popd; unset id save_id;
 
 if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
