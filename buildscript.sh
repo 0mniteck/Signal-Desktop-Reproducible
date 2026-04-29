@@ -658,6 +658,7 @@ TERM=$term
 XDG_CONFIG_HOME=$home
 XDG_SESSION_ID=\$XDG_USR_SESSION
 XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
+ls -laR /sys/fs/cgroup/ > $home/cgrp
 
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
@@ -700,7 +701,7 @@ docker buildx create \
   --driver docker-container --driver-opt \"cgroup-parent=docker.slice,network=host,\
 default-load=true,image=\$moby\" --bootstrap --use || exit 78
 
-$PUSHD_RESULTS
+$pushd_results
 pushd env >> $pushd_log
   unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env; set > \$save_id
@@ -758,7 +759,7 @@ if [[ \"\$CROSS\" == *,* ]]; then
 fi
 
 if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" != *no* ]]; then
-  source modules || drop_down || exit \$PIPESTATUS
+  source runtime || drop_down || exit \$PIPESTATUS
   \$PUSHD_RESULTS
     scan_using_grype ubuntu \"/ --select-catalogers directory\"
     touch readme.md && > readme.md && cat */*.vulns >> readme.md
