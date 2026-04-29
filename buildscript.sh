@@ -695,7 +695,12 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   rootless='Rootless Docker Started\n'; echo -e \$rootless;
   echo -e \$rootless > $rootless_path/tmp/rootless.status; fi;
 
-pushd $results >> $pushd_log
+docker buildx create \
+  --name \$MODULE-builder \$CROSS --buildkitd-flags \"--oci-worker-rootless=true\" \
+  --driver docker-container --driver-opt \"cgroup-parent=docker.slice,network=host,\
+default-load=true,image=\$moby\" --bootstrap --use || exit 78
+
+$PUSHD_RESULTS
 pushd env >> $pushd_log
   unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env; set > \$save_id
