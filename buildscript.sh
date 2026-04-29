@@ -276,9 +276,7 @@ quiet() {
 }
 
 if [[ "$MOUNT" != "" ]]; then unmount; fi; clean_all || echo "Failed clean_all"
-apt-get -qq update && apt-get -qq upgrade -y
-if [[ "$(which gh)" == "" ]]; then
-  apt-get -qq install --no-install-recommends gh; fi;
+apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ fuse-overlayfs+ gh+ git-lfs+ \
                                                                     gnupg2+ gpg-agent+ iptables+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
@@ -697,7 +695,7 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   rootless='Rootless Docker Started\n'; echo -e \$rootless;
   echo -e \$rootless > $rootless_path/tmp/rootless.status; fi;
 
-eval \"\$PUSHD_RESULTS\"
+pushd $results >> $pushd_log
 pushd env >> $pushd_log
   unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env; set > \$save_id
