@@ -69,7 +69,7 @@ fi
   $POPD
 
 docker run -it --cpus=$(nproc) \
-  --network=host,\"driver-opt=network=host\" \
+  --network=host,"driver-opt=network=host" \
   --platform linux/$ANAME --cgroupns private \
   --name $MODULE --pull -e SOURCE_DATE_EPOCH=$SDE \
   $(cat $RESULTS/$ANAME/$MODULE.manifest.ref) \
