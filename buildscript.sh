@@ -644,8 +644,7 @@ $debug && export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/docker.env
 > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env && wait
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
---ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true \
---evacuate-cgroup2=$user_slice/$user_service \
+--ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=user.slice \
 --state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile \
 <(echo set -m) --noprofile -i -c '
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
