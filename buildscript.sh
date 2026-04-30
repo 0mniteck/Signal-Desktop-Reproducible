@@ -701,6 +701,7 @@ sed -i \"s|Slice.*|Slice=/$user_slice/session-\$XDG_USR_SESSION.scope/$user_slic
 sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker.dockerd.service|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
+sys_ctl_common || true
 if [[ \"$DEBUG\" == *yes* ]]; then
   echo created: $rootless_path.sh
   cat $rootless_path.sh
@@ -710,7 +711,7 @@ if [[ \"$DEBUG\" == *yes* ]]; then
   cat $systemd_service
   read -p test_here; fi;
 
-sys_ctl_common || true; systemctl --user start docker.dockerd && sleep 10
+systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
 source $rootless_path/tmp/rootless.env && echo \"$rootless_path/tmp/rootless.env sourced\" || exit 1
 quiet \"docker info | grep rootless > $rootless_path/tmp/rootless.status\"
