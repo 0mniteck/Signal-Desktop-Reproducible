@@ -277,7 +277,7 @@ snap_install() { # $4 = --unaliased (optional), $5 = --name=instance_name (optio
 
 # apparm() { # $1 = [-a/-r] [--add/--replace]
 #   rm -f $apparmor_profile;
-#   cp $apparmor_path/*snap-confine* $apparmor_profile
+#   cp -f $apparmor_path/*snap-confine* $apparmor_profile
 #   apparmor_parser $1 -K --abort-on-error --namespace-string docker $apparmor_profile }
 
 quiet() {
@@ -608,8 +608,8 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
-    mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
-    mv -T $home/.gnupg $home/$snap_path/.gnupg || exit 1; else
+    mv -f -T $home/.password-store $home/$snap_path/.password-store || exit 1
+    mv -f -T $home/.gnupg $home/$snap_path/.gnupg || exit 1; else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
     echo -e '\nCheck Yubikey and .identity file\n'
     lsusb && ls -la /dev/hid* && gpg-card list - openpgp
@@ -627,7 +627,7 @@ elif [[ \"\$EPOCH\" != 0 ]]; then echo \"Using override timestamp \$EPOCH for SO
   source_date_epoch=\$((\$EPOCH)); else timestamp=\$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5);
   if [[ \"\$timestamp\" != \"\" ]]; then echo \"Setting SOURCE_DATE_EPOCH from release.sha512sum: \
 \$(cat $results/release.sha512sum | grep Epoch | cut -d ' ' -f5)\";
-    cp $results/release.sha512sum /tmp/release.last.sha512sum && check_file=yes || exit 1
+    cp -f $results/release.sha512sum /tmp/release.last.sha512sum && check_file=yes || exit 1
     source_date_epoch=\$((timestamp)); else echo \"Can't get latest commit timestamp. Defaulting to 1.\";
     source_date_epoch=1; fi; fi;
 
@@ -685,7 +685,7 @@ sed \"s/^/export -- /g\" $rootless_path/rootless.env > $rootless_path/tmp/rootle
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
 ____EOF
 
-cp $systemd_service $sysusr_service && wait && \
+cp -f $systemd_service $sysusr_service && wait && \
 sed -i \"s|Type.*|Type=exec|\" $sysusr_service && \
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/rootless.env|\" $sysusr_service && \
@@ -724,8 +724,8 @@ pushd env >> $pushd_log
   unset id save_id; id=\$(id -u)
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
-  mv $docker_data/0:0.env .
-  cp $rootless_path/{cgroups.ls,docker.env} .
+  mv -f $docker_data/0:0.env .
+  cp -f $rootless_path/{cgroups.ls,docker.env} .
 
   echo -e '\nDocker Version:\n' > docker.info
   quiet 'docker version >> docker.info'
@@ -737,7 +737,7 @@ pushd env >> $pushd_log
   quiet 'docker buildx inspect --bootstrap >> docker.info'
   $popd; if [[ \"$DEBUG\" == *yes* ]]; then
   pushd debug >> $pushd_log
-    mv $docker_data/snap.{info,install,events} .
+    mv -f $docker_data/snap.{info,install,events} .
   $popd; fi;
 $popd; unset id save_id;
 
@@ -745,28 +745,28 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(which docker-credential-pass)\" == \"\" ]]; then
     validate.with.pki \"\$cred_helper\" || exit 1
     echo \"\$cred_helper_sha  \$cred_helper_name\" | sha512sum -c || exit 1
-    mv \$cred_helper_name $local_bin/docker-credential-pass && \
+    mv -f \$cred_helper_name $local_bin/docker-credential-pass && \
     chmod +x $local_bin/docker-credential-pass || exit 1
-  else cp \$(which docker-credential-pass) $local_bin/docker-credential-pass || exit 1; fi;
+  else cp -f \$(which docker-credential-pass) $local_bin/docker-credential-pass || exit 1; fi;
 
   echo '{
   \"credsStore\": \"pass\"
 }' > $home/docker/config.json
 
   echo Installed at: $local_bin/docker-credential-pass && \
-  cp \$(which pass) $local_bin/pass && \
+  cp -f \$(which pass) $local_bin/pass && \
   echo Installed at: $local_bin/pass && \
-  cp \$(which gpg) $local_bin/gpg && \
+  cp -f \$(which gpg) $local_bin/gpg && \
   echo Installed at: $local_bin/gpg && \
-  cp /lib/$uname-$OSTYPE/libassuan.so.9* $local_lib/$uname-$OSTYPE/ && \
+  cp -f /lib/$uname-$OSTYPE/libassuan.so.9* $local_lib/$uname-$OSTYPE/ && \
   echo Installed at: $local_lib/$uname-$OSTYPE/libassuan.so.9 || exit 1
 
   credstat='docker-credential-pass list'
   echo && read -p '🔐 Press enter to start docker login.'
   snap run --shell docker_rootless.docker -c 'PATH=\$PATH:$local_bin ; \
   LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$local_lib/:$local_lib/$uname-$OSTYPE ; docker login' || exit 1
-  mv -T $home/$snap_path/.password-store $home/.password-store || exit 1
-  mv -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
+  mv -f -T $home/$snap_path/.password-store $home/.password-store || exit 1
+  mv -f -T $home/$snap_path/.gnupg $home/.gnupg && echo Credentials: \$(\$credstat) || exit 1
   syft login registry-1.docker.io -u \$USERNAME && echo -e '\nLogged in to syft\n' || exit 1
 fi
 
