@@ -5,6 +5,18 @@
 
 This project reproducibly builds Signal Desktop for Debian:trixie-arm64, currently targeting tag `8.2.x`
 
+# WIP
+* [x] Built with [0mniteck/debian-slim:02-18-2026](https://hub.docker.com/r/0mniteck)
+* [x] Pubkey pinning for curl [.pki submodule]
+* [x] Auto-Update script
+* [ ] Signal Desktop builds - preparing for v8.x.x
+* [ ] Base image builds and pushes to Docker Hub
+* [ ] Rootless builds using snap cohort pinning
+* [ ] CC'd base images available for amd64
+* [ ] Zero CVE build environment using dhi.io
+* [ ] Reproducible builds - auto shasum matching
+* [ ] Generate/Scan/Attest SBOM at buildtime
+
 > Now with an optional update client: [`auto-update-cron.sh`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/master/auto-update-cron.sh)
 
 This is the latest release: [`builds/release/signal-desktop_8.2.0_arm64.deb`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/builds/release/signal-desktop_8.2.0_arm64.deb)
@@ -87,17 +99,6 @@ cd Signal-Desktop-Reproducible && \
 ```
 
 ## Current Status:‎‎‏‏‎‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎[![CI](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml/badge.svg?branch=8.2.x)](https://github.com/signalapp/Signal-Desktop/actions/workflows/ci.yml)<sub><sup> signalapp/Signal-Desktop</sup></sub>
-
-# WIP
-* [x] Built with [0mniteck/debian-slim:02-18-2026](https://hub.docker.com/r/0mniteck)
-* [ ] Signal Desktop builds - preparing for v8.x.x
-* [ ] Base image builds and pushes to Docker Hub
-* [ ] Rootless builds
-* [ ] CC'd base images available for amd64
-* [ ] Zero CVE build environment
-* [x] Auto-Update script
-* [ ] Reproducible builds
-* [ ] Generate/Scan/Attest SBOM at buildtime
 
 ## Release Cycle:
 
