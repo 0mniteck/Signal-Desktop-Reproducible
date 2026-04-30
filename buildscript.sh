@@ -653,7 +653,7 @@ source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
 echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path $results/{arm64,amd64,source,env,debug} || exit 1
-if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results* && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1; fi;
+touch $rootless_path.sh; if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results* && > $rootless_path.sh || exit 1; fi; chmod +x $rootless_path.sh || exit 1
 
 cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
