@@ -412,7 +412,7 @@ touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- ANAME='$ANAME' BRANCH='$BRANCH' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' EPOCH='$EPOCH' \
 GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
-PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF='$(<$HOME/.ssh/config)' \
+PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF='\$(<$HOME/.ssh/config)' \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
 seen1=\"$seen\"; seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
