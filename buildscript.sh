@@ -581,7 +581,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   read -r -p 'Run git fetch --unshallow? (y/n/<depth>): ' ans; if [[ \"\$ans\" == *y* ]]; then
     confirm 'git fetch --unshallow - git@ssh (twice)' && echo 'Starting Git fetch...'
     git fetch --unshallow 2>> $nulled || true
-  elif [[ \"\$ans\" != "" && \"\$ans\" != *n* ]]; then
+  elif [[ \"\$ans\" != \"\" && \"\$ans\" != *n* ]]; then
     confirm 'git fetch --depth \$ans - git@ssh' && echo 'Starting Git fetch...'
     git fetch --depth \$ans 2>> $nulled || true
   else
