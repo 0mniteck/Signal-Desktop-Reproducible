@@ -643,12 +643,10 @@ export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
 source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
 echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
-if [[ \"$NO_CLEAN\" == \"\" ]]; then
-  rm -r -f Results* $results*; mkdir -p $results/{arm64,amd64,source,env,debug} || exit 1
-  mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
-  touch $rootless_path/{docker,rootless,tmp/rootless}.env && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1; fi;
+mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path $results/{arm64,amd64,source,env,debug} || exit 1
+if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results* && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1; fi;
 
-cat >> $rootless_path.sh << ____EOF
+cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug && export -- HOME=$home PATH=$path TERM=$term && cd $PWD
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/docker.env
