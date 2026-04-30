@@ -652,7 +652,7 @@ cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
 mkdir -p $rootless_path/tmp && > $rootless_path/docker.env && > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env
-rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=$plugins_run --copy-up=/sys/fs/cgroup --disable-host-loopback \
+rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
 --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=user.slice \
 --state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
 $debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
