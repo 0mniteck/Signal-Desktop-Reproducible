@@ -207,6 +207,9 @@ ExitType=cgroup\\
 CPUQuota=$((nproc))00%\\
 IOWeight=5000\\
 StartupIOWeight=10000\\
+StandardError=journal\\
+SyslogIdentifier=USR_RNLVL\\
+SyslogLevel=debug\\
 Slice=placeholder\\
 ___EOF
 )
