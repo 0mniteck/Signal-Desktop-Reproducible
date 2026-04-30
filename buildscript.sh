@@ -221,6 +221,10 @@ if [[ "$NO_CLEAN" == "" ]]; then
   /run/containerd/ \
   /run/docker* \
   /run/runc/ \
+  /run/snap.docker*; else
+  rm -r -f /run/containerd/ \
+  /run/docker* \
+  /run/runc/ \
   /run/snap.docker*; fi;
 }
 
