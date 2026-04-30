@@ -94,6 +94,7 @@ elif [[ "$TEST" != *yes* ]]; then
   debug="set -vxeo pipefail"
   declare -- ${TEST}="yes"
   declare -- TESTS="${TEST}=${!TEST}"
+  NO_CLEAN="yes"
   TEST="yes"
   test
 else
@@ -181,6 +182,7 @@ sysusr_service=$sysusr_path/docker.dockerd.service
 systemd_path=/etc/systemd/system
 systemd_service=$systemd_path/snap.docker_rootless.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
+plugins_run=/run/docker/plugins
 var_docker=/var/snap/docker
 snap_path=snap/docker_rootless/$docker_snap_ver
 docker_plugins=/$plugins_path/docker-
@@ -233,15 +235,16 @@ if [[ "$NO_CLEAN" == "" ]]; then
 }
 
 unmount() {
-  quiet snap stop --disable docker_rootless && sleep 1
-  if [[ -d $docker_data ]]; then
-    lsof_d="$(cat <(lsof -F p $docker_data | cut -d'p' -f2 || true))"
-    for l in $lsof_d; do quiet kill $l; done; unset l
-    if [[ "$NO_CLEAN" == "" ]]; then rm -r -f $docker_data/*; sync; fi; fi;
-  quiet umount $docker_data && sleep 1
-  quiet systemd-cryptsetup detach $module && sleep 1
-  quiet dmsetup remove /dev/mapper/$module && sleep 1
-  if [[ "$NO_CLEAN" == "" ]]; then rm -r -f $docker_data/; sync; fi;
+  if [[ "$NO_CLEAN" == "" ]]; then
+    quiet snap stop --disable docker_rootless && sleep 1
+    if [[ -d $docker_data ]]; then
+      lsof_d="$(cat <(lsof -F p $docker_data | cut -d'p' -f2 || true))"
+      for l in $lsof_d; do quiet kill $l; done; unset l
+      rm -r -f $docker_data/*; sync; fi;
+    quiet umount $docker_data && sleep 1
+    quiet systemd-cryptsetup detach $module && sleep 1
+    quiet dmsetup remove /dev/mapper/$module && sleep 1
+    rm -r -f $docker_data/; sync; fi;
 }
 
 systemd_ctl_common() { # $1 = mask/unmask, $2 = wait/sleep\ 1s, $3 = --now
@@ -319,10 +322,10 @@ update-alternatives --install /usr/bin/docker docker $docker 50
 
 # if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
 echo 'options overlay metacopy=on' > /etc/modprobe.d/metacopy.conf
-modprobe -a ip_tables overlay && wait && quiet 'echo Y | tee /sys/module/overlay/parameters/metacopy'
+modprobe -a ip_tables overlay erofs && wait && quiet 'echo Y | tee /sys/module/overlay/parameters/metacopy'
 quiet 'sysctl -w kernel.unprivileged_userns_clone=1'
 
-mkdir -p $docker_data /$plugins_path && chown $run_as:$run_as $docker_data && \
+mkdir -p $docker_data /$plugins_path $run_plugins && chown $run_as:$run_as $docker_data $run_plugins && \
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 
@@ -643,10 +646,9 @@ cat >> $rootless_path.sh << ____EOF
 $debug && export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/docker.env
 > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env && wait
-rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
+rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=$run_plugins --copy-up=/sys/fs/cgroup --disable-host-loopback \
 --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=user.slice \
---state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile \
-<(echo set -m) --noprofile -i -c '
+--state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 
