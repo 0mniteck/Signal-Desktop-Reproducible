@@ -284,6 +284,7 @@ quiet() {
   echt="$@"; script -a -q -c "$echt" $nulled >> $nulled
 }
 
+if [[ "$TEST" == *yes* ]]; then chown root:root $nulled $pushd_log; fi;
 if [[ "$MOUNT" != "" ]]; then unmount; fi; clean_all || echo "Failed clean_all"
 apt-get -qq update && apt-get -qq upgrade -y && \
 apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ fuse-overlayfs+ gh+ git-lfs+ \
@@ -410,7 +411,7 @@ touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- ANAME='$ANAME' BRANCH='$BRANCH' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' EPOCH='$EPOCH' \
 GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
-PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF='\$(<$HOME/.ssh/config)' \
+PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF='$(<$HOME/.ssh/config)' \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
 seen1=\"$seen\"; seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
@@ -514,12 +515,12 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
 }
 
 ssh_config() {
-  if [[ \"\$(echo \$(eval \$SSH_CONFIG) | grep -o $module)\" != *$module* ]]; then echo \"
+  if [[ \"\$(echo \$SSH_CONFIG | grep -o $module)\" != *$module* ]]; then echo \"
 Host \$MODULE
   Hostname github.com
   IdentityFile $home/\$IDENTITY_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config; fi;
-  if [[ \"\$(echo \$(eval \$SSH_CONFIG) | grep -o pki )\" != *pki* ]]; then echo \"
+  if [[ \"\$(echo \$SSH_CONFIG | grep -o pki )\" != *pki* ]]; then echo \"
 Host .pki
   Hostname github.com
   IdentityFile $home/\$PKI_ID_FILE
@@ -585,11 +586,11 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   git remote remove origin && git remote add origin git@\$MODULE:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
 
-  read -r -p 'Run git fetch --unshallow? (y/n/<depth>): ' ans; if [[ \"\$ans\" == *y* ]]; then
+  read -r -p 'Run git fetch --unshallow? (y/n/<depth>)[3]: ' ans; if [[ \"\$ans\" == *y* ]]; then
     confirm 'git fetch --unshallow - git@ssh (twice)' && echo 'Starting Git fetch...'
     git fetch --unshallow 2>> $nulled || true
   elif [[ \"\$ans\" != \"\" && \"\$ans\" != *n* ]]; then
-    confirm 'git fetch --depth \$ans - git@ssh' && echo 'Starting Git fetch...'
+    confirm 'git fetch --depth '\$ans' - git@ssh' && echo 'Starting Git fetch...'
     git fetch --depth \$ans 2>> $nulled || true
   else
     confirm 'git fetch --depth 3 - git@ssh' && echo 'Starting Git fetch...'
