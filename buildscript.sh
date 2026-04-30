@@ -576,9 +576,12 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   git remote remove origin && git remote add origin git@\$MODULE:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
 
-  read -r -p 'git fetch --unshallow? (y/n): ' ans; if [[ \"\$ans\" == *y* ]]; then shallow=--unshallow ; fi;
-  confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
-  git fetch \$shallow 2>> $nulled || true
+  read -r -p 'Run git fetch --unshallow? (y/n): ' ans; if [[ \"\$ans\" == *y* ]]; then
+    confirm 'git fetch --unshallow - git@ssh (twice)' && echo 'Starting Git fetch...'
+    git fetch --unshallow 2>> $nulled || true
+  else
+    confirm 'git fetch - git@ssh (twice)' && echo 'Starting Git fetch...'
+    git fetch --depth 3 2>> $nulled || true; fi;
 
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
