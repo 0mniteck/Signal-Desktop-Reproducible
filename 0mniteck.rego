@@ -1,4 +1,4 @@
-# 0mniteck.rego - v0.1.1-Alpha - Multi-Repo Policy File
+# 0mniteck.rego - v0.1.2-Alpha - Multi-Repo Policy File
 # Strict requirement for docker public registries: https, and @digest_tag or --checksum
 #
 #  Demos:
@@ -7,7 +7,10 @@
 # docker buildx policy eval --print --fields image.checksum docker-image://$source_img
 # docker buildx policy eval --print $source
 # Builtins: print load_json verify_git_signature pin_image
+# [input.image.checksum input.image.labels input.image.user input.image.volumes input.image.workingDir \
+# input.image.env input.image.hasProvenance input.image.signatures input.image.fullRepo]
 #
+
 package docker
 
 default allow := false
