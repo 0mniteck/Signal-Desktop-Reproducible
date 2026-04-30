@@ -11,7 +11,7 @@ This project reproducibly builds Signal Desktop for Debian:trixie-arm64, current
 * [x] Auto-Update script
 * [ ] Signal Desktop builds - preparing for v8.x.x
 * [ ] Base image builds and pushes to Docker Hub
-* [ ] Rootless builds using snap cohort pinning
+* [ ] Rootless builds using snap instances and cohort pinning
 * [ ] CC'd base images available for amd64
 * [ ] Zero CVE build environment using dhi.io
 * [ ] Reproducible builds - auto shasum matching
