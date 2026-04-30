@@ -186,7 +186,8 @@ sysusr_service=$sysusr_path/docker.dockerd.service
 systemd_path=/etc/systemd/system
 systemd_service=$systemd_path/snap.docker_rootless.dockerd.service
 plugins_path=usr/libexec/docker/cli-plugins
-plugins_run=/run/docker/plugins
+plugins_run=/run/user/1000/docker
+run_plugins=/run/docker
 var_docker=/var/snap/docker
 snap_path=snap/docker_rootless/$docker_snap_ver
 docker_plugins=/$plugins_path/docker-
@@ -319,20 +320,21 @@ for plug in $plugs; do
 done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | sed 's/\ /,\ /g' )\033[K"\\n
 unset plugs plug; echo;
 
+# if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
+echo 'options overlay metacopy=on' > /etc/modprobe.d/metacopy.conf
+modprobe -a ip_tables overlay erofs && wait && quiet 'echo Y | tee /sys/module/overlay/parameters/metacopy'
+quiet 'sysctl -w kernel.unprivileged_userns_clone=1'
+
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
 update-alternatives --remove-all docker 2> $nulled || true
 update-alternatives --install /usr/bin/docker docker $docker 50
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed clean_most"
 
-# if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
-echo 'options overlay metacopy=on' > /etc/modprobe.d/metacopy.conf
-modprobe -a ip_tables overlay erofs && wait && quiet 'echo Y | tee /sys/module/overlay/parameters/metacopy'
-quiet 'sysctl -w kernel.unprivileged_userns_clone=1'
-
-mkdir -p $docker_data /$plugins_path $run_plugins && chown $run_as:$run_as $docker_data && \
+mkdir -p $docker_data /$plugins_path $plugins_run/plugins && chown -R $run_as:$run_as $docker_data $plugins_run && \
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
+ln -f -s $plugins_run $run_plugins
 
 if [[ "$TESTS" != *SKIP_LOGIN* ]]; then
   if [[ "$(cat $sc_rules | grep $run_as)" != *$run_as* ]]; then
@@ -411,8 +413,8 @@ mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- ANAME='$ANAME' BRANCH='$BRANCH' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' EPOCH='$EPOCH' \
-GPG_TTY='\$(/bin/tty)' HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
-PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF='\$(<$HOME/.ssh/config)' \
+GPG_TTY=\"\$(/bin/tty)\" HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
+PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF=\"\$(<$HOME/.ssh/config)\" \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
 seen1=\"$seen\"; seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
@@ -516,12 +518,12 @@ scan_using_grype() { # \$1 = name, \$2 = repo/name:tag or '/path --select-catalo
 }
 
 ssh_config() {
-  if [[ \"\$(echo \$SSH_CONFIG | grep -o $module)\" != *$module* ]]; then echo \"
+  if [[ \"\$(echo \$SSH_CONF | grep -o $module)\" != *$module* ]]; then echo \"
 Host \$MODULE
   Hostname github.com
   IdentityFile $home/\$IDENTITY_FILE
   IdentitiesOnly yes\" >> $home/.ssh/config; fi;
-  if [[ \"\$(echo \$SSH_CONFIG | grep -o pki )\" != *pki* ]]; then echo \"
+  if [[ \"\$(echo \$SSH_CONF | grep -o pki )\" != *pki* ]]; then echo \"
 Host .pki
   Hostname github.com
   IdentityFile $home/\$PKI_ID_FILE
