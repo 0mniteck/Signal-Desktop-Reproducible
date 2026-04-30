@@ -485,7 +485,7 @@ attest_multi-arch() { # \$1 = name, \$2 = repo/name:tag, \$3 = \$cross (--platfo
     digest2=\$(echo \$jsin | jq .manifest.manifests.[1].digest | cut -d'\"' -f2)
     arr2=\$(echo \$jsin | jq .manifest.manifests.[1].platform.architecture | cut -d'\"' -f2)
     att2=\$(echo \$(echo \$jsin | jq .manifest.manifests.[3].annotations.[] | cut -d'\"' -f2 ) | cut -d' ' -f1)
-    
+
     if [[ \"\$digest1\" == \"\$att1\" ]]; then echo docker.io/\$2@\$digest1 > \$arr1/\$1.manifest.ref; fi;
     if [[ \"\$digest2\" == \"\$att2\" ]]; then echo docker.io/\$2@\$digest2 > \$arr2/\$1.manifest.ref; fi;
     for arr in \$arr1 \$arr2; do echo 'Starting Cosign...'; pushd \$arr >> $pushd_log
@@ -697,7 +697,7 @@ sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $s
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/rootless.env|\" $sysusr_service && \
 sed -i \"s|Delegate.*|Delegate=cpu cpuset io memory pids|\" $sysusr_service && \
 sed -i \"s|Syslog.*|SyslogIdentifier=docker.dockerd|\" $sysusr_service && \
-sed -i \"s|Slice.*|Slice=/$user_slice/session-\$XDG_USR_SESSION.scope/$user_slice/$user_service/docker.slice|\" $sysusr_service && \
+sed -i \"s|Slice.*|Slice=session-\$XDG_USR_SESSION.scope-docker.slice|\" $sysusr_service && \
 sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker.dockerd.service|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
