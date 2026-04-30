@@ -204,7 +204,7 @@ AllowIsolate=true\\
 \\\\[Service\\\\]\\
 Group=$run_as\\
 ExitType=cgroup\\
-CPUQuota=$((nproc))00%\\
+CPUQuota=$(cat <(nproc))00%\\
 IOWeight=5000\\
 StartupIOWeight=10000\\
 StandardError=journal\\
