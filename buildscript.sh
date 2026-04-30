@@ -319,10 +319,10 @@ done; sleep 1; printf "\rRemoved plugs: $(echo $plugs | sed 's/\ /,\ /g' )\033[K
 unset plugs plug; echo;
 
 systemd_ctl_common mask wait --now || echo "Failed systemctl_common_mask"
-mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
-clean_most || echo "Failed clean_most"
 update-alternatives --remove-all docker 2> $nulled || true
 update-alternatives --install /usr/bin/docker docker $docker 50
+mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
+clean_most || echo "Failed clean_most"
 
 # if [[ -f $apparmor_profile ]]; then apparm -r; else apparm -a; fi;
 echo 'options overlay metacopy=on' > /etc/modprobe.d/metacopy.conf
