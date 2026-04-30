@@ -9,7 +9,7 @@ This project reproducibly builds Signal Desktop for Debian:trixie-arm64, current
 * [x] Built with [0mniteck/debian-slim:02-18-2026](https://hub.docker.com/r/0mniteck)
 * [x] Pubkey pinning for curl [.pki][submodule] - limited to local or pinned .workflows
 * [ ] Signal Desktop builds - preparing for v8.x.x
-* [ ] Base image builds and pushes to Docker Hub
+* [ ] Base image builds, attests, and pushes to Docker Hub
 * [ ] Rootless builds using named $SNAP_INSTANCES
 * [ ] CC'd base images available for amd64
 * [ ] Zero CVE build environment using dhi.io
