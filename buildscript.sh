@@ -330,7 +330,7 @@ echo 'options overlay metacopy=on' > /etc/modprobe.d/metacopy.conf
 modprobe -a ip_tables overlay erofs && wait && quiet 'echo Y | tee /sys/module/overlay/parameters/metacopy'
 quiet 'sysctl -w kernel.unprivileged_userns_clone=1'
 
-mkdir -p $docker_data /$plugins_path $run_plugins && chown $run_as:$run_as $docker_data $run_plugins && \
+mkdir -p $docker_data /$plugins_path $run_plugins && chown $run_as:$run_as $docker_data && \
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 
@@ -648,13 +648,12 @@ if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results* && > $rootless_
 
 cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
-$debug && export -- HOME=$home PATH=$path TERM=$term && cd $PWD
-mkdir -p $rootless_path/tmp && wait && > $rootless_path/docker.env
-> $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env && wait
-rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=$run_plugins --copy-up=/sys/fs/cgroup --disable-host-loopback \
+$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
+mkdir -p $rootless_path/tmp && > $rootless_path/docker.env && > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env
+rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=$plugins_run --copy-up=/sys/fs/cgroup --disable-host-loopback \
 --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=user.slice \
 --state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
-$debug && export -- HOME=$home PATH=$path TERM=$term && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
+$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
