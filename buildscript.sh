@@ -4,6 +4,8 @@
 usage() {
 cat << _EOF
 
+Info: Buildscript for Signal Desktop
+
 General Usage:
   Synopsis:
         $0 [options] -- <commit message - description>
@@ -15,7 +17,8 @@ General Usage:
 
   Requirements:
         1. Ubuntu 25.10+ (arm64 or amd64)
-        2. .dotfiles (./.pinned_ver, ./.rego, and ./.identity)
+        2. Yubikey 5.7.1+ with CCID enabled
+        3. .dotfiles (./.pinned_ver, ./.rego, and ./.identity)
 
   Options:
         [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
@@ -39,6 +42,7 @@ General Usage:
         - GPG/GIT: <10482171+0mniteck@users.noreply.github.com>
         - COSIGN/SIGSTORE: <tiger-varsity-alto@duck.com>
         - CONTACT/MAILTO: <shantt@duck.com>
+
 
 _EOF
 }
@@ -356,7 +360,7 @@ pushd $docker_data >> $pushd_log
 {connections,"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
       echo "---------------snap-$debugger---------------" >> snap.info; quiet "snap $debugger >> snap.info"; done; unset debugger
     states=$(snap debug state --changes /var/lib/snapd/state.json | cut -w -f1 | sed 1d | tr '\n' ' ' )
-    if [[ "$((${#states[0]}/2))" -ge 100 || "$DEBUG" == *no* ]]; then
+    if [[ "$((${#states[0]}/2))" -ge 100 ]]; then
       unset states; echo "Too many change ID's, start from a clean snapd install to run debugger"; fi;
     for state in $states; do
       echo "-------------debug-state-change-$state-------------" >> snap.events
@@ -599,7 +603,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   else git submodule --quiet foreach \"cd .. && git config submodule.\$name.url git@\$name:\$REPO/\$name.git\"; fi;
   git submodule update --init --remote --merge
 
-  if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* && \"$DEBUG\" != *no* ]]; then
+  if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
     mv -T $home/.password-store $home/$snap_path/.password-store || exit 1
@@ -637,20 +641,21 @@ export -- SOURCE_DATE_EPOCH=\$source_date_epoch SDE=\$source_date_epoch \
 source_date_epoch=\$source_date_epoch sde=\$source_date_epoch
 echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
-if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results*; mkdir -p $results/{arm64,amd64,source,env,debug}; fi;
-mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
-touch $rootless_path/{docker,rootless,tmp/rootless}.env && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
+if [[ \"$NO_CLEAN\" == \"\" ]]; then
+  rm -r -f Results* $results*; mkdir -p $results/{arm64,amd64,source,env,debug} || exit 1
+  mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
+  touch $rootless_path/{docker,rootless,tmp/rootless}.env && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1; fi;
 
 cat >> $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
-$debug && export -- HOME=$home PATH=$path TERM=$term
+$debug && export -- HOME=$home PATH=$path TERM=$term && cd $PWD
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/docker.env
 > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env && wait
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=$run_plugins --copy-up=/sys/fs/cgroup --disable-host-loopback \
 --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=user.slice \
 --state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
+$debug && export -- HOME=$home PATH=$path TERM=$term && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
-ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
@@ -700,7 +705,7 @@ if [[ \"$DEBUG\" == *yes* ]]; then
   cat $systemd_service
   read -p test_here; fi;
 
-sys_ctl_common || true; systemctl --user start docker.dockerd; sleep 10;
+sys_ctl_common || true; systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
 source $rootless_path/tmp/rootless.env && echo \"$rootless_path/tmp/rootless.env sourced\" || exit 1
 quiet \"docker info | grep rootless > $rootless_path/tmp/rootless.status\"
@@ -769,10 +774,9 @@ fi
 if [[ \"\$CROSS\" == *,* ]]; then
   if [[ \"\$(uname -m)\" == \"aarch64\" ]]; then docker run --privileged --cgroupns private --pull --rm \$binfmt_arm64 --install amd64;
   elif [[ \"\$(uname -m)\" == \"x86_64\" ]]; then docker run --privileged --cgroupns private --pull --rm \$binfmt_amd64 --install arm64;
-  else echo 'Unknown Architecture '\$(uname -m); exit 1; fi; echo;
-fi
+  else echo 'Unknown Architecture '\$(uname -m); exit 1; fi; echo; fi;
 
-if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" != *no* ]]; then
+if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" == \"\" ]]; then
   source runtime || drop_down || exit \$PIPESTATUS
   \$PUSHD_RESULTS
     scan_using_grype ubuntu \"/ --select-catalogers directory\"
@@ -813,15 +817,15 @@ for pid in $pids; do
   done; sleep 0.1; done; unset pid pids pid_0 mk_pid dir_pid lsof_d
 
 clean_all || echo "Failed clean_all"
-sed -i "s|:/home/root:|:/root:|" /etc/passwd
-systemd_ctl_common unmask sleep\ 1 || echo \"Failed systemctl_common_unmask\"
-
 if [[ "$NO_CLEAN" == "" ]]; then
+  sed -i "s|:/home/root:|:/root:|" /etc/passwd
+  update-alternatives --remove-all docker 2> $nulled || true
+  systemd_ctl_common unmask sleep\ 1 || echo \"Failed systemctl_common_unmask\"
+
   snap remove syft --purge --terminate
   snap remove grype --purge --terminate
   snap remove docker_rootless --purge --terminate 2>> $nulled && sleep 1
   snap remove docker_rootless --purge --terminate 2>> $nulled || echo "Failed to remove Docker Rootless"; fi;
 
-update-alternatives --remove-all docker 2> $nulled || true
 clean_all || echo "Failed clean_all"
 if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log; fi; exit 0
