@@ -375,9 +375,9 @@ pushd $docker_data >> $pushd_log
         quiet "snap debug timings $state >> snap.events"
       done; unset states state; printf '\rSaved debugger info\033[K'\\n\\n
       cat /tmp/snap_ch_id_* >> snap.install; rm -f /tmp/snap_ch_id_*
-    fi; fi; id=$(id -u); save_id=$id:$id.env
-    set > $save_id; env | sort >> $save_id; declare >> $save_id
-    chown --quiet $run_as:$run_as $save_id snap.{info,install,events} || true
+  fi; fi; id=$(id -u); save_id=$id:$id.env
+  set > $save_id; env | sort >> $save_id; declare >> $save_id
+  chown --quiet $run_as:$run_as $save_id snap.{info,install,events} || true
 popd -- >> $pushd_log; unset debugger states state id save_id
 
 if [[ "$TEST" == *yes* ]]; then
