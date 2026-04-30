@@ -172,7 +172,9 @@ data_dir=$local_data/share
 rootless_path=$data_dir/rootless
 apparmor_path=/etc/apparmor.d
 apparmor_profile=$apparmor_path/re-snapd.rootless.docker
-cgroup_base=/sys/fs/cgroup/user.slice/user-${run_id}.slice
+user_slice=user.slice/user-${run_id}.slice
+cgroup_base=/sys/fs/cgroup/$user_slice
+user_service=user@$run_id.service
 sc_rules=/lib/udev/rules.d/60-scdaemon.rules
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
@@ -195,7 +197,7 @@ AllowIsolate=true\\
 \\\\[Service\\\\]\\
 Group=$run_as\\
 ExitType=cgroup\\
-Slice=docker.slice\\
+Slice=placeholder\\
 ___EOF
 )
 
@@ -389,7 +391,7 @@ wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
 rem="rm -f $docker_data/xs.id"
 
 eval $rem && wait
-$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/slirp4; $rem; fi;") & mk_pid=$!
+$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/$user_slice/$user_service; $rem; fi;") & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
@@ -411,7 +413,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf \"\r$mk_pid: seen-daemon(seend) still running...\033[K\"; sleep 5
-done; sleep 1; mkdir -p \$seend/slirp4 && \
+done; sleep 1; mkdir -p \$seend/$user_slice/$user_service && \
 printf \"\rSession directory for session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
@@ -642,9 +644,12 @@ $debug && export -- HOME=$home PATH=$path TERM=$term
 mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker
 > $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
---ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=slirp4 \
---state-dir=$rootless_path/tmp /bin/env -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
+--ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true \
+--evacuate-cgroup2=$user_slice/$user_service \
+--state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile \
+<(echo set -m) --noprofile -i -c '
 env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
+ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
 BUILDKIT_PROGRESS=tty
@@ -666,7 +671,6 @@ TERM=$term
 XDG_CONFIG_HOME=$home
 XDG_SESSION_ID=\$XDG_USR_SESSION
 XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
-ls -laR /sys/fs/cgroup/ > $home/cgrp
 
 sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
 \$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
@@ -682,6 +686,7 @@ sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $s
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
 sed -i \"s|Delegate.*|Delegate=cpu cpuset io memory pids|\" $sysusr_service && \
 sed -i \"s|Syslog.*|SyslogIdentifier=docker.dockerd|\" $sysusr_service && \
+sed -i \"s|Slice.*|Slice=/$user_slice/session-\$XDG_USR_SESSION.scope/$user_slice/$user_service/docker.slice|\" $sysusr_service && \
 sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker.dockerd.service|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
 
@@ -715,7 +720,8 @@ pushd env >> $pushd_log
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
   mv $docker_data/0:0.env .
-  cp $rootless_path/env-docker docker.env
+  cp $rootless_path/{cgroups.ls,env-docker} .
+  mv env-docker docker.env
 
   echo -e '\nDocker Version:\n' > docker.info
   quiet 'docker version >> docker.info'
