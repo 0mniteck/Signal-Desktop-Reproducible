@@ -174,7 +174,7 @@ apparmor_path=/etc/apparmor.d
 apparmor_profile=$apparmor_path/re-snapd.rootless.docker
 user_slice=user.slice/user-${run_id}.slice
 cgroup_base=/sys/fs/cgroup/$user_slice
-user_service=user@$run_id.service
+user_service=user@${run_id}.service
 sc_rules=/lib/udev/rules.d/60-scdaemon.rules
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
@@ -522,7 +522,7 @@ Host .pki
 drop_down() {
   set +xv; read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
   /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; export -- HOME=$HOME PATH=\$PATH TERM=$TERM; \
-  echo source .identity; echo source .pinned_ver; echo source $rootless_path/tmp/env-rootless.exp; \
+  echo source .identity; echo source .pinned_ver; echo source $rootless_path/tmp/rootless.env; \
   echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
   PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'; BUILDKIT_PROGRESS=plain;\"); $debug
 }
@@ -636,19 +636,19 @@ echo -e \"Setting rel_date from today's date: \$rel_date\n\"
 
 if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* $results*; mkdir -p $results/{arm64,amd64,source,env,debug}; fi;
 mkdir -p $docker_data/{syft,grype,tmp} $local_bin $local_lib/$uname-$OSTYPE $rootless_path/tmp $sysusr_path || exit 1
-touch $rootless_path/{env-{docker,rootless},tmp/env-rootless.exp} && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
+touch $rootless_path/{docker,rootless,tmp/rootless}.env && > $rootless_path.sh && chmod +x $rootless_path.sh || exit 1
 
 cat >> $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug && export -- HOME=$home PATH=$path TERM=$term
-mkdir -p $rootless_path/tmp && wait && > $rootless_path/env-docker
-> $rootless_path/env-rootless && > $rootless_path/tmp/env-rootless.exp && wait
+mkdir -p $rootless_path/tmp && wait && > $rootless_path/docker.env
+> $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env && wait
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
 --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true \
 --evacuate-cgroup2=$user_slice/$user_service \
 --state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile \
 <(echo set -m) --noprofile -i -c '
-env > $rootless_path/env-docker && grep ROOTLESS $rootless_path/env-docker > $rootless_path/env-rootless
+env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
@@ -670,10 +670,10 @@ SYFT_CACHE_DIR=$docker_data/syft
 TERM=$term
 XDG_CONFIG_HOME=$home
 XDG_SESSION_ID=\$XDG_USR_SESSION
-XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/env-rootless
+XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/rootless.env
 
-sed \"s/^/export -- /g\" $rootless_path/env-rootless > $rootless_path/tmp/env-rootless.exp
-\$(echo \"echo echo $\(\<$rootless_path/env-rootless\)\" $dockerd --rootless \
+sed \"s/^/export -- /g\" $rootless_path/rootless.env > $rootless_path/tmp/rootless.env
+\$(echo \"echo echo $\(\<$rootless_path/rootless.env\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
 --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
 --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
@@ -683,7 +683,7 @@ ____EOF
 cp $systemd_service $sysusr_service && wait && \
 sed -i \"s|Type.*|Type=exec|\" $sysusr_service && \
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
-sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/env-rootless|\" $sysusr_service && \
+sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/rootless.env|\" $sysusr_service && \
 sed -i \"s|Delegate.*|Delegate=cpu cpuset io memory pids|\" $sysusr_service && \
 sed -i \"s|Syslog.*|SyslogIdentifier=docker.dockerd|\" $sysusr_service && \
 sed -i \"s|Slice.*|Slice=/$user_slice/session-\$XDG_USR_SESSION.scope/$user_slice/$user_service/docker.slice|\" $sysusr_service && \
@@ -701,7 +701,7 @@ if [[ \"$DEBUG\" == *yes* ]]; then
 
 sys_ctl_common || true; systemctl --user start docker.dockerd; sleep 10;
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
-source $rootless_path/tmp/env-rootless.exp && echo \"$rootless_path/tmp/env-rootless.exp sourced\" || exit 1
+source $rootless_path/tmp/rootless.env && echo \"$rootless_path/tmp/rootless.env sourced\" || exit 1
 quiet \"docker info | grep rootless > $rootless_path/tmp/rootless.status\"
 
 if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; then
@@ -720,8 +720,7 @@ pushd env >> $pushd_log
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
   mv $docker_data/0:0.env .
-  cp $rootless_path/{cgroups.ls,env-docker} .
-  mv env-docker docker.env
+  cp $rootless_path/{cgroups.ls,docker.env} .
 
   echo -e '\nDocker Version:\n' > docker.info
   quiet 'docker version >> docker.info'
