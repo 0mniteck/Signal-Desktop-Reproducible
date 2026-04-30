@@ -300,7 +300,7 @@ snap_install grype --classic $ch_grype || exit 1
 snap set system experimental.parallel-instances=true && \
 printf '\rFetching snap "docker_rootless"\033[K' && \
 snap download --basename=docker_rootless docker --cohort=$ch_docker >> $nulled && \
-snap ack docker_rootless.assert || exit 1
+snap ack docker_rootless.assert || echo "snap ack failed!"
 snap_install docker_rootless.snap --jailmode $ch_docker --unaliased --name=docker_rootless || exit 1
 if [[ "$NO_CLEAN" == "" ]]; then rm -f *.assert *.snap; fi;
 
