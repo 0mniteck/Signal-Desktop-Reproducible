@@ -7,21 +7,21 @@ This project reproducibly builds Signal Desktop for Debian:trixie-arm64, current
 
 # WIP
 * [x] Built with [0mniteck/debian-slim:02-18-2026](https://hub.docker.com/r/0mniteck)
-* [x] Pubkey pinning for curl [.pki submodule]
-* [x] Auto-Update script
+* [x] Pubkey pinning for curl [.pki][submodule] - limited to local or pinned .workflows
 * [ ] Signal Desktop builds - preparing for v8.x.x
 * [ ] Base image builds and pushes to Docker Hub
-* [ ] Rootless builds using snap instances and cohort pinning
+* [ ] Rootless builds using named $SNAP_INSTANCES
 * [ ] CC'd base images available for amd64
 * [ ] Zero CVE build environment using dhi.io
 * [ ] Reproducible builds - auto shasum matching
-* [ ] Generate/Scan/Attest SBOM at buildtime
-
-> Now with an optional update client: [`auto-update-cron.sh`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/master/auto-update-cron.sh)
+* [ ] Release_Immutable/Scan/Attest on publish using [.pki/.workflows] 
+* [ ] Snap cohort pinning and commit sha's in .pinned_ver file
+* [ ] .rego Policy Enforcement (available in snap buildx v31)
+* [ ] Provable human interaction to build and sign using privkey only on yubikey from .identity file
 
 This is the latest release: [`builds/release/signal-desktop_8.2.0_arm64.deb`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/builds/release/signal-desktop_8.2.0_arm64.deb)
 
-Sha512Sum: [`Results/release.sha512sum`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/release.sha512sum)
+Sha512sum: [`Results/release.sha512sum`](https://github.com/0mniteck/Signal-Desktop-Reproducible/blob/8.2.x/Results/release.sha512sum)
 
 > ### Full chain/("Full Scope") SBOMs and Attestations
 >
