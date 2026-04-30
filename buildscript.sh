@@ -208,7 +208,6 @@ CPUQuota=$((nproc))00%\\
 IOWeight=5000\\
 StartupIOWeight=10000\\
 StandardError=journal\\
-SyslogIdentifier=USR_RNLVL\\
 SyslogLevel=debug\\
 Slice=placeholder\\
 ___EOF
@@ -699,13 +698,13 @@ ____EOF
 
 cp -f $systemd_service $sysusr_service && wait && \
 sed -i \"s|Type.*|Type=exec|\" $sysusr_service && \
-sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service && \
+sed -i \"s|Syslog.*|SyslogIdentifier=DOCKERD_USR_RNLVL|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/rootless.env|\" $sysusr_service && \
 sed -i \"s|Delegate.*|Delegate=cpu cpuacct cpuset io memory pids|\" $sysusr_service && \
-sed -i \"s|Syslog.*|SyslogIdentifier=docker.dockerd|\" $sysusr_service && \
 sed -i \"s|Slice.*|Slice=session-\$XDG_USR_SESSION.scope-docker.slice|\" $sysusr_service && \
 sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker.dockerd.service|\" $sysusr_service && \
-sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service || exit 1
+sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service && \
+sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service || exit 1
 
 sys_ctl_common || true
 if [[ \"$DEBUG\" == *yes* ]]; then
