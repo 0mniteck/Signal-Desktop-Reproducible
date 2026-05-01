@@ -410,7 +410,7 @@ wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
 rem="rm -f $docker_data/xs.id"
 
 eval $rem && wait
-$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/docker.slice; $rem; fi;") & mk_pid=$!
+$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/{user.slice/user-1000.slice,docker.scope}; $rem; fi;") & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
@@ -432,7 +432,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf \"\r$mk_pid: seen-daemon(seend) still running...\033[K\"; sleep 5
-done; sleep 1; mkdir -p \$seend/docker.slice && \
+done; sleep 1; mkdir -p \$seend/docker.scope && \
 printf \"\rSession directory for session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
@@ -659,12 +659,12 @@ touch $rootless_path.sh; if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* 
 
 cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
-$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
+$debug
 mkdir -p $rootless_path/tmp && > $rootless_path/docker.env && > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env
-rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --copy-up=/sys/fs/cgroup/user.slice/user-1000.slice \
---disable-host-loopback --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=docker.slice \
+rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback --ipv6 \
+--cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=docker.scope \
 --state-dir=$rootless_path/tmp -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
-$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
+$debug && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
@@ -710,8 +710,6 @@ if [[ \"$DEBUG\" == *yes* ]]; then
   cat $rootless_path.sh
   echo modified: $sysusr_service
   cat $sysusr_service
-  echo original: $systemd_service
-  cat $systemd_service
   read -p test_here; fi;
 
 systemctl --user start docker.dockerd && sleep 10
