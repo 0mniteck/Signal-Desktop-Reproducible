@@ -179,7 +179,6 @@ apparmor_path=/etc/apparmor.d
 apparmor_profile=$apparmor_path/re-snapd.rootless.docker
 user_slice=user.slice/user-${run_id}.slice
 cgroup_base=/sys/fs/cgroup/$user_slice
-user_service=user@${run_id}.service
 sc_rules=/lib/udev/rules.d/60-scdaemon.rules
 sysusr_path=$data_dir/systemd/user
 sysusr_service=$sysusr_path/docker.dockerd.service
@@ -209,7 +208,7 @@ IOWeight=5000\\
 StartupIOWeight=10000\\
 StandardError=journal\\
 SyslogLevel=debug\\
-Slice=placeholder\\
+Slice=docker.slice\\
 ___EOF
 )
 
@@ -217,7 +216,7 @@ clean_most() {
 if [[ "$NO_CLEAN" == "" ]]; then
   rm -r -f /home/root/* \
   /root/snap/docker* \
-  $docker_data* \
+  $docker_data* /opt \
   $var_docker/common/* \
   $var_docker/$docker_snap_ver/* \
   $run_dir/containerd/ \
@@ -297,7 +296,7 @@ quiet() {
 if [[ "$TEST" == *yes* ]]; then chown root:root $nulled $pushd_log; fi;
 if [[ "$MOUNT" != "" ]]; then unmount; fi; clean_all || echo "Failed clean_all"
 apt-get -qq update && apt-get -qq upgrade -y && \
-apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ fuse-overlayfs+ gh+ git-lfs+ \
+apt-get -qq install --no-install-recommends --purge --autoremove -u acl+ bc+ cosign+ dbus-user-session+ dosfstools+ erofs-utils+ fuse-overlayfs+ gh+ git-lfs+ \
                                                                     gnupg2+ gpg-agent+ iptables+ jq+ parted+ pass+ pinentry-curses+ pkexec+ rootlesskit+ \
                                                                     scdaemon+ slirp4netns+ snapd+ systemd-container+ systemd-cryptsetup+ \
                                                                     uidmap+ golang-github*- golang-docker*- \
@@ -340,7 +339,7 @@ update-alternatives --install /usr/bin/docker docker $docker 50
 mkdir -p /home/root && sed -i.backup "s|:/root:|:/home/root:|" /etc/passwd
 clean_most || echo "Failed clean_most"
 
-mkdir -p $docker_data /$plugins_path $plugins_run/plugins && chown -R $run_as:$run_as $docker_data $plugins_run && \
+mkdir -p $docker_data /opt /$plugins_path $plugins_run/plugins && chown -R $run_as:$run_as $docker_data /opt $plugins_run && \
 ln -f -s /$snap_path${docker_plugins}buildx ${docker_plugins}buildx >> $nulled || exit 1
 ln -f -s /$snap_path${docker_plugins}compose ${docker_plugins}compose >> $nulled || exit 1
 ln -f -s $plugins_run $run_plugins
@@ -411,7 +410,7 @@ wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
 rem="rm -f $docker_data/xs.id"
 
 eval $rem && wait
-$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/$user_slice/$user_service; $rem; fi;") & mk_pid=$!
+$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/docker.slice; $rem; fi;") & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
@@ -433,7 +432,7 @@ echo \$XDG_USR_SESSION > $docker_data/xs.id
 
 while [[ -f $docker_data/xs.id || \$(cat <(lsof -F p -p $mk_pid -R | grep -o $mk_pid)) == *$mk_pid* ]]; do
   printf \"\r$mk_pid: seen-daemon(seend) still running...\033[K\"; sleep 5
-done; sleep 1; mkdir -p \$seend/$user_slice/$user_service && \
+done; sleep 1; mkdir -p \$seend/docker.slice && \
 printf \"\rSession directory for session-\$XDG_USR_SESSION.scope seen.\033[K\n\n\" || exit 1
 
 eval \$(ssh-agent -s) >> $nulled && wait
@@ -619,6 +618,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   if [[ \"\$(gpg-card list - openpgp)\" == *\$SIGNING_KEY* ]]; then
     echo -e '\nSigning key present' && mkdir -p $home/.password-store $home/$snap_path/ && pass init \$SIGNING_KEY && echo && \
     printf 'pass is initialized\npass is initialized\n' | pass insert docker-credential-helpers/docker-pass-initialized-check >> $nulled || exit 1
+    rm -r -f $home/$snap_path/.{password-store,gnupg} || exit 1
     mv -f -T $home/.password-store $home/$snap_path/.password-store || exit 1
     mv -f -T $home/.gnupg $home/$snap_path/.gnupg || exit 1; else
     echo && echo \"Signing key \$SIGNING_KEY missing\"
@@ -661,9 +661,9 @@ cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
 $debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
 mkdir -p $rootless_path/tmp && > $rootless_path/docker.env && > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env
-rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback \
---ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=user.slice \
---state-dir=$rootless_path/tmp /bin/env - /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
+rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --copy-up=/sys/fs/cgroup/user.slice/user-1000.slice \
+--disable-host-loopback --ipv6 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=docker.slice \
+--state-dir=$rootless_path/tmp -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
 $debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 
@@ -701,12 +701,10 @@ sed -i \"s|Type.*|Type=exec|\" $sysusr_service && \
 sed -i \"s|Syslog.*|SyslogIdentifier=DOCKERD_USR_RNLVL|\" $sysusr_service && \
 sed -i \"s|EnvironmentFile.*|EnvironmentFile=-$rootless_path/rootless.env|\" $sysusr_service && \
 sed -i \"s|Delegate.*|Delegate=cpu cpuacct cpuset io memory pids|\" $sysusr_service && \
-sed -i \"s|Slice.*|Slice=session-\$XDG_USR_SESSION.scope-docker.slice|\" $sysusr_service && \
 sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker.dockerd.service|\" $sysusr_service && \
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service && \
-sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service || exit 1
+sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service || exit 1; sys_ctl_common || true
 
-sys_ctl_common || true
 if [[ \"$DEBUG\" == *yes* ]]; then
   echo created: $rootless_path.sh
   cat $rootless_path.sh
@@ -737,7 +735,7 @@ pushd env >> $pushd_log
   save_id=\$id:\$id.env; set > \$save_id
   env | sort >> \$save_id; declare >> \$save_id
   mv -f $docker_data/0:0.env .
-  cp -f $rootless_path/{cgroups.ls,docker.env} .
+  cp -f $rootless_path/{cgroups.ls,{docker,rootless}.env} .
 
   echo -e '\nDocker Version:\n' > docker.info
   quiet 'docker version >> docker.info'
