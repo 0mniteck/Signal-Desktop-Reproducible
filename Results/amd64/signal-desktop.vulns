@@ -1,0 +1,4 @@
+### signal-desktop:amd64 Grype Scan Results - grype 0.109.1
+ Scanned for vulnerabilities [934 vulnerability matches] 
+ by severity: 2 critical, 91 high, 233 medium, 45 low, 702 negligible (97 unknown)
+ by status: 71 fixed, 1099 not-fixed, 236 ignored 
