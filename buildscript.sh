@@ -664,7 +664,7 @@ rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cg
 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=docker.scope \
 --state-dir=$rootless_path/tmp -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
 $debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
-mkdir -p /sys/fs/cgroup/{$user_slice,system.slice} && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
+mkdir -p /sys/fs/cgroup/{$user_slice,system.slice,init.scope} && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
