@@ -659,12 +659,12 @@ touch $rootless_path.sh; if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* 
 
 cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
-$debug
+$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
 mkdir -p $rootless_path/tmp && > $rootless_path/docker.env && > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback --ipv6 \
 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=docker.scope \
 --state-dir=$rootless_path/tmp -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
-$debug && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
+$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 
 echo \"BUILDKIT_MULTI_PLATFORM=true
@@ -705,12 +705,12 @@ sed -i \"s|X-Snappy.*|Conflicts=snap.docker_rootless.dockerd.service snap.docker
 sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\" $sysusr_service && \
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service || exit 1; sys_ctl_common || true
 
-if [[ \"$DEBUG\" == *yes* ]]; then
+if [[ \"$DEBUG_DOCKERD\" != \"\" ]]; then
   echo created: $rootless_path.sh
   cat $rootless_path.sh
   echo modified: $sysusr_service
   cat $sysusr_service
-  read -p test_here; fi;
+  read -p test_dockerd_here; fi;
 
 systemctl --user start docker.dockerd && sleep 10
 systemctl --user status docker.slice docker.dockerd --all --no-pager -l > $rootless_path/dockerd.log || true
