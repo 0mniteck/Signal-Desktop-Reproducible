@@ -95,14 +95,12 @@ if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
   pushd_log=/dev/null
   TEST="no"
 elif [[ "$TEST" != *yes* ]]; then
-  debug="set -vxeo pipefail"
-  declare -- ${TEST}="yes"
-  declare -- TESTS="${TEST}=${!TEST}"
-  NO_CLEAN="yes"
+  for T in $(echo $TEST | tr ',' ' ' ); do declare -- ${T}="yes"; declare -- TESTS+="${T}=${!T},"; done
+  if [[ "$DEBUG" == *yes* ]]; then debug="set -vxeo pipefail"; else debug="set -eo pipefail"; fi;
   TEST="yes"
   test
 else
-  debug="echo"
+  debug="echo pipefail: ignored"
   DEBUG="no"
   TESTS="DEBUG=no"
   TEST="yes"
@@ -722,7 +720,7 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   rootless='Rootless Docker Started\n'; echo -e \$rootless;
   echo -e \$rootless > $rootless_path/tmp/rootless.status; fi;
 
-read -p TEST_HERE
+if [[ \"$DEBUG_BUILDX\" != \"\" ]]; then read -p TEST_HERE; fi;
 
 docker buildx create \
   --name \$MODULE-builder \$CROSS --buildkitd-flags \"--oci-worker-rootless=true\" \
