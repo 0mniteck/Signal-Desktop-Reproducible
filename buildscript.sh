@@ -364,7 +364,7 @@ fi
 
 pushd $docker_data >> $pushd_log
   if [[ "$DEBUG" == *yes* || "$NO_CLEAN" != "" ]]; then
-    read -r -p 'Run debugger? (y/n): ' ans; if [[ \"\$ans\" == *y* ]]; then
+    read -r -p 'Run debugger? (y/n): ' ans; if [[ "$ans" == *y* ]]; then
       printf '\rSaving debugger info...\033[K'; unset debugger states state id save_id; > snap.info; > snap.install; > snap.events
       for debugger in \
 {connections,"version --verbose","debug "{{,sandbox-}features,"execution "{apparmor,snap},confinement,paths,snap-downloads-cache,seeding},"changes --abs-time","refresh --time"}; do
@@ -388,7 +388,7 @@ pushd $docker_data >> $pushd_log
   chown --quiet $run_as:$run_as $save_id snap.{info,install,events} || true
 popd -- >> $pushd_log; unset debugger states state id save_id
 
-if [[ "$TEST" == *yes* ]]; then
+if [[ "$DEBUG_RNLVL" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
   chown $run_as:$run_as $nulled $pushd_log; export -- \
   SYSTEMD_LOG_LEVEL=debug NO_COLOR=true LESSSECURE=1 \
@@ -418,8 +418,8 @@ $debug && cd $PWD
 mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
-export -- ANAME='$ANAME' BRANCH='$BRANCH' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' EPOCH='$EPOCH' \
-GPG_TTY=\"\$(/bin/tty)\" HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
+export -- ANAME='$ANAME' BRANCH='$BRANCH' COMMIT='$COMMIT' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' \
+EPOCH='$EPOCH' GPG_TTY=\"\$(/bin/tty)\" HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
 PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF=\"\$(<$HOME/.ssh/config)\" \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
@@ -595,15 +595,19 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
   git remote remove origin && git remote add origin git@\$MODULE:\$REPO/\$PROJECT.git
   git-lfs install && git reset --hard && git clean -xfd
 
-  read -r -p 'Run git fetch --unshallow? (y/n/<depth>)[3]: ' ans; if [[ \"\$ans\" == *y* ]]; then
-    confirm 'git fetch --unshallow - git@ssh (twice)' && echo 'Starting Git fetch...'
-    git fetch --unshallow 2>> $nulled || true
-  elif [[ \"\$ans\" != \"\" && \"\$ans\" != *n* ]]; then
-    confirm 'git fetch --depth '\$ans' - git@ssh' && echo 'Starting Git fetch...'
-    git fetch --depth \$ans 2>> $nulled || true
+  if [[ \"\$(git log --oneline | wc -l)\" -eq 1 ]]; then
+    read -r -p 'Run git fetch --unshallow? (y/n/<depth>)[3]: ' ans; if [[ \"\$ans\" == *y* ]]; then
+      confirm 'git fetch --unshallow - git@ssh (twice)' && echo 'Starting Git fetch...'
+      git fetch --unshallow 2>> $nulled || true
+    elif [[ \"\$ans\" != \"\" && \"\$ans\" != *n* ]]; then
+      confirm 'git fetch --depth '\$ans' - git@ssh' && echo 'Starting Git fetch...'
+      git fetch --depth \$ans 2>> $nulled || true
+    else
+      confirm 'git fetch --depth 3 - git@ssh' && echo 'Starting Git fetch...'
+      git fetch --depth 3 2>> $nulled || true; fi;
   else
-    confirm 'git fetch --depth 3 - git@ssh' && echo 'Starting Git fetch...'
-    git fetch --depth 3 2>> $nulled || true; fi;
+    confirm 'git fetch --depth '\$(git log --oneline | wc -l)' - git@ssh' && echo 'Starting Git fetch...'
+    git fetch --depth \$(git log --oneline | wc -l) 2>> $nulled || true; fi;
 
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
   git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
@@ -794,7 +798,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" == \"\" ]]; then
   \$POPD
   git status && git add -A && git status && confirm 'git commit - git@ssh'
   if [[ \"\$BRANCH\" != \"\" ]]; then
-    git commit -a -S -m \"$COMMIT \$date_rel\" && \
+    git commit -a -S -m \"\$COMMIT \$date_rel\" && \
     git push --set-upstream origin \$(git rev-parse --abbrev-ref HEAD):\$BRANCH
     if [[ \"\$TAG\" != \"\" ]]; then
       git tag -a \"\$TAG\" -s -m \"Tagged Release \$TAG\" && sleep 5 && \
