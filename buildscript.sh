@@ -707,7 +707,7 @@ sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $s
 if [[ \"$DEBUG_DOCKERD\" != \"\" ]]; then
   echo -en '\ncreated: $rootless_path.sh\n\n'
   cat $rootless_path.sh
-  echo -en '\nmodified: $sysusr_service\n\n'
+  echo -en '\n\nmodified: $sysusr_service\n\n'
   cat $sysusr_service; echo
   read -p 'TEST DOCKERD HERE'; fi;
 
