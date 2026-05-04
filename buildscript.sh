@@ -705,9 +705,9 @@ sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service || exit 1; sys_ctl_common || true
 
 if [[ \"$DEBUG_DOCKERD\" != \"\" ]]; then
-  echo -en '\ncreated: $rootless_path.sh\n'
+  echo -en '\ncreated: $rootless_path.sh\n\n'
   cat $rootless_path.sh
-  echo -en '\nmodified: $sysusr_service\n'
+  echo -en '\nmodified: $sysusr_service\n\n'
   cat $sysusr_service; echo
   read -p 'TEST DOCKERD HERE'; fi;
 
@@ -803,7 +803,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" == \"\" ]]; then
     fi; fi; else drop_down || echo \$PIPESTATUS
 fi;
 
-pids=\"\$pid_1 \$pid_2 \$pid_3\"
+pids=\"\$pid_1 \$pid_2 \$pid_3 \$(cat $run_dir/docker.pid || printf '')\"
 for pid in \$pids; do
   while [[ \$(cat <(lsof -F p -p \$pid -R | grep -o \$pid)) == *\$pid* ]]; do
     printf \$pid': pid still running...\n'; quiet kill \$pid && echo 'Killed pid: '\$pid; sleep 0.1;
@@ -818,7 +818,7 @@ if [[ "$TEST" == *yes* ]]; then chown root:root $nulled $pushd_log; fi;
 if [[ "$MOUNT" != "" ]]; then unmount; fi;
 if [[ -d $home/$snap_path ]]; then declare -- dir_pid="$(cat <(lsof -F p $home/$snap_path | cut -d'p' -f2 || true))"; fi;
 
-pids="$pid_0 $mk_pid $dir_pid $lsof_d"
+pids="$pid_0 $mk_pid $dir_pid $lsof_d $(cat $run_dir/docker.pid || printf '')"
 for pid in $pids; do
   while [[ $(cat <(lsof -F p -p $pid -R | grep -o $pid)) == *$pid* ]]; do
     printf $pid': pid still running...'\\n; quiet kill $pid; echo 'Killed pid: '$pid; sleep 0.1;
