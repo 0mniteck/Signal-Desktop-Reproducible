@@ -691,7 +691,7 @@ XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/rootless.env
 sed \"s/^/export -- /g\" $rootless_path/rootless.env > $rootless_path/tmp/rootless.env
 \$(echo \"echo echo $\(\<$rootless_path/rootless.env\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init --init \
---feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
+--feature cdi=false --cgroup-parent=/docker.scope --group $run_as --data-root $docker_data \
 --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
 ____EOF
@@ -726,7 +726,7 @@ read -p TEST_HERE
 
 docker buildx create \
   --name \$MODULE-builder \$CROSS --buildkitd-flags \"--oci-worker-rootless=true\" \
-  --driver docker-container --driver-opt \"cgroup-parent=docker.slice,network=host,\
+  --driver docker-container --driver-opt \"cgroup-parent=/docker.scope,network=host,\
 default-load=true,image=\$moby\" --bootstrap --use || exit 78
 
 $pushd_results
