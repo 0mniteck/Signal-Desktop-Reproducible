@@ -16,8 +16,8 @@ General Usage:
           $0 ${PRESERVED}
 
   Requirements:
-        1. Ubuntu 25.10+ (arm64 or amd64)
-        2. Yubikey 5.7.1+ with CCID enabled
+        1. Ubuntu 25.10 (arm64 or amd64)
+        2. Yubikey 5+ with CCID enabled
         3. .dotfiles (./.pinned_ver, ./.rego, and ./.identity)
 
   Options:
