@@ -388,13 +388,15 @@ popd -- >> $pushd_log; unset debugger states state id save_id
 
 if [[ "$DEBUG_RNLVL" == *yes* ]]; then
   echo -e '\nRunning as user: '$run_as' - user_id:group_id '$run_id:$run_id'\n'
-  chown $run_as:$run_as $nulled $pushd_log; export -- \
-  SYSTEMD_LOG_LEVEL=debug NO_COLOR=true LESSSECURE=1 \
+  export -- SYSTEMD_LOG_LEVEL=debug NO_COLOR=true LESSSECURE=1 \
   SYSTEMD_LOG_COLOR=false SYSTEMD_COLORS=false \
   SYSTEMD_LOG_LOCATION=true SYSTEMD_LOG_TIME=true \
   SYSTEMD_LOG_TARGET=console SYSTEMD_URLIFY=false
   debug_cat="journalctl --output=cat --identifier=USR_RNLVL --follow"
   systemd_cat="systemd-cat --identifier=USR_RNLVL --priority=debug"
+fi;
+
+if [[ "$TEST" == "yes" ]]; then chown $run_as:$run_as $nulled $pushd_log;
 else push="--push"; declare -- PUSH="$push"; fi;
 
 if [[ "$CROSS" == "yes" ]]; then
