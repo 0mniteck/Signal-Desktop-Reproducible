@@ -43,7 +43,6 @@ General Usage:
         - COSIGN/SIGSTORE: <tiger-varsity-alto@duck.com>
         - CONTACT/MAILTO: <shantt@duck.com>
 
-
 _EOF
 }
 
@@ -81,29 +80,25 @@ if [[ "$CROSS" == "" ]]; then declare -- CROSS="yes"; fi;
 if [[ "$EPOCH" == "" ]]; then declare -- EPOCH=0; fi;
 
 test() {
-  nulled=/tmp/nulled.log
-  pushd_log=/tmp/pushd.log
-  if [[ "$RUNME" != "" ]]; then
+  unset nulled pushd_log
+  if [[ "$RUNME" != "" && "$DEBUG" == *yes* ]]; then
+    debug="set -vxeo pipefail"; nulled=/tmp/nulled.log; pushd_log=/tmp/pushd.log;
     if [[ "$NO_CLEAN" == "" ]]; then rm -f $nulled $pushd_log /tmp/ch_id_*; fi;
     touch $nulled $pushd_log; > $nulled; > $pushd_log
+  else debug="set -eo pipefail"; nulled=/dev/null; pushd_log=/dev/null;
   fi; declare -g -- nulled; declare -g -- pushd_log; usage
 }
 
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
-  debug="set -eo pipefail"
-  nulled=/dev/null
-  pushd_log=/dev/null
-  TEST="no"
+  debug="set -eo pipefail"; TEST="no";
+  nulled=/dev/null; pushd_log=/dev/null;
 elif [[ "$TEST" != *yes* ]]; then
   for T in $(echo $TEST | tr ',' ' ' ); do declare -- ${T}="yes"; declare -- TESTS+="${T}=${!T},"; done
-  if [[ "$DEBUG" == *yes* ]]; then debug="set -vxeo pipefail"; else debug="set -eo pipefail"; fi;
   TEST="yes"
   test
 else
-  debug="echo pipefail: ignored"
-  DEBUG="no"
-  TESTS="DEBUG=no"
-  TEST="yes"
+  debug="echo pipefail: ignored";
+  DEBUG="no"; TESTS="DEBUG=no,"; TEST="yes";
   test
 fi
 
@@ -150,8 +145,9 @@ Override Date: $EPOCH
 Increment: $INC
 Mount: /dev/$MOUNT
 Run Tests: TEST=$TEST - \
-TESTS=$TESTS - $TESTS
+TESTS - $(echo $TESTS | tr ',' ' ')
 Run Level: $RUNME
+
 __EOF
 fi
 
