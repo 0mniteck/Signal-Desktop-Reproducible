@@ -722,6 +722,8 @@ if [[ \"\$(grep root $rootless_path/tmp/rootless.status)\" != *rootless* ]]; the
   rootless='Rootless Docker Started\n'; echo -e \$rootless;
   echo -e \$rootless > $rootless_path/tmp/rootless.status; fi;
 
+read -p TEST_HERE
+
 docker buildx create \
   --name \$MODULE-builder \$CROSS --buildkitd-flags \"--oci-worker-rootless=true\" \
   --driver docker-container --driver-opt \"cgroup-parent=docker.slice,network=host,\
