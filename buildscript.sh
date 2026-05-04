@@ -204,6 +204,7 @@ StartupIOWeight=10000\\
 StandardError=journal\\
 SyslogLevel=debug\\
 Slice=docker.slice\\
+ExecStop=kill \\\\$(cat $run_dir/docker.pid 2>> $nulled || printf '')\\
 ___EOF
 )
 
