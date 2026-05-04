@@ -8,7 +8,7 @@ Info: Buildscript for Signal Desktop
 
 General Usage:
   Synopsis:
-        $0 [options] -- <commit message - description>
+        buildscript.sh [options] -- <commit message - description>
 
   - Example:
           $0 --increment .01 --push-branch 8.x.x --date today -- "Successful Release v8.x.x - changes..."
