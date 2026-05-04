@@ -80,13 +80,15 @@ if [[ "$CROSS" == "" ]]; then declare -- CROSS="yes"; fi;
 if [[ "$EPOCH" == "" ]]; then declare -- EPOCH=0; fi;
 
 test() {
-  unset nulled pushd_log
+  unset debug nulled pushd_log
   if [[ "$RUNME" != "" && "$DEBUG" == *yes* ]]; then
     debug="set -vxeo pipefail"; nulled=/tmp/nulled.log; pushd_log=/tmp/pushd.log;
     if [[ "$NO_CLEAN" == "" ]]; then rm -f $nulled $pushd_log /tmp/ch_id_*; fi;
     touch $nulled $pushd_log; > $nulled; > $pushd_log
-  else debug="set -eo pipefail"; nulled=/dev/null; pushd_log=/dev/null;
-  fi; declare -g -- nulled; declare -g -- pushd_log; usage
+  elif [[ "$RUNME" != "" && "$DEBUG" == *no* ]]; then debug="echo pipefail: ignored";
+  nulled=/dev/null; pushd_log=/dev/null;
+  elif [[ "$RUNME" != "" ]]; then debug="set -eo pipefail"; nulled=/dev/null; pushd_log=/dev/null;
+  fi; declare -g -- debug; declare -g -- nulled; declare -g -- pushd_log; usage
 }
 
 if [[ "$TEST" == "" || "$TEST" == *no* ]]; then
@@ -97,7 +99,6 @@ elif [[ "$TEST" != *yes* ]]; then
   TEST="yes"
   test
 else
-  debug="echo pipefail: ignored";
   DEBUG="no"; TESTS="DEBUG=no,"; TEST="yes";
   test
 fi
