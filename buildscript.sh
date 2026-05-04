@@ -405,7 +405,7 @@ wait2="if [[ -d $docker_data/ && -f $docker_data/xs.id ]]; then"
 rem="rm -f $docker_data/xs.id"
 
 eval $rem && wait
-$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/{user.slice/user-1000.slice,docker.scope}; $rem; fi;") & mk_pid=$!
+$(sleep 10; eval "$wait1 $wait2 mkdir -p $cgroup_base/session-$(cat $docker_data/xs.id).scope/docker.scope; $rem; fi;") & mk_pid=$!
 seen="$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)"
 
 $debug_cat & pid_0=$!
@@ -691,7 +691,7 @@ XDG_RUNTIME_DIR=$run_dir\" >> $rootless_path/rootless.env
 sed \"s/^/export -- /g\" $rootless_path/rootless.env > $rootless_path/tmp/rootless.env
 \$(echo \"echo echo $\(\<$rootless_path/rootless.env\)\" $dockerd --rootless \
 --userland-proxy-path $docker_path/docker-proxy --init-path $docker_path/docker-init \
---init --feature cdi=false --group $run_as --data-root $docker_data \
+--init --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
 --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
 ____EOF
@@ -727,8 +727,8 @@ if [[ \"$DEBUG_BUILDX\" != \"\" ]]; then read -p 'TEST BUILDX HERE'; fi;
 
 docker buildx create \
   --name \$MODULE-builder \$CROSS --buildkitd-flags \"--oci-worker-rootless=true\" \
-  --driver docker-container --driver-opt \"network=host,default-load=true,image=\$moby\" \
-  --bootstrap --use || exit 78
+  --driver docker-container --driver-opt \"cgroup-parent=docker.slice,network=host,\
+default-load=true,image=\$moby\" --bootstrap --use || exit 78
 
 $pushd_results
 pushd env >> $pushd_log
