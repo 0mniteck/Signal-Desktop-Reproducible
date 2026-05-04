@@ -24,7 +24,7 @@ General Usage:
         [--cross-compile,-c yes|no] , [--date,-d date_epoch|today] ,
         [--increment,-i <.version #>] , [--mount,-m <device in /dev>] ,
         [--push-branch,-p <branch-name>] , [--release-tag,-r <tag-name>] ,
-        [--test,-t DEBUG|SKIP_LOGIN] , [--help,-h] , [-- <commit message>]
+        [--test,-t <LIST,OF,DEBUG,OPTS>] , [--help,-h] , [-- <commit message>]
 
   Usage Details:
         -c, --cross-compile <yes|no>     Cross-compile image for arm64/amd64 (ex. no)
@@ -33,7 +33,7 @@ General Usage:
         -m, --mount <device in /dev>     Mount ephemeral LUKS partition (ex. sdb)
         -p, --push-branch <branch-name>  Push to branch (ex. 8.22.x)
         -r, --release-tag <tag-name>     Release tag (ex. 8.44.0)
-        -t, --tests <DEBUG|SKIP_LOGIN>   Skip Docker/Github login (ex. SKIP_LOGIN)
+        -t, --tests <DEBUG,[DEBUG_OPT]>  List of test options (ex. SKIP_LOGIN,DEBUG_BUILDX/DOCKERD)
         -h, --help                       Show this usage file
         - , -- <commit message - desc>   Commit message (ex. "8.x Success! - changes...")
 
