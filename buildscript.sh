@@ -805,7 +805,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* && \"$DEBUG\" == \"\" ]]; then
     fi; fi; else drop_down || echo \$PIPESTATUS
 fi;
 
-pids=\"\$pid_1 \$pid_2 \$pid_3 \$(cat $run_dir/docker.pid || printf '')\"
+pids=\"\$pid_1 \$pid_2 \$pid_3 \$(cat $run_dir/docker.pid 2>> $nulled || printf '')\"
 for pid in \$pids; do
   while [[ \$(cat <(lsof -F p -p \$pid -R | grep -o \$pid)) == *\$pid* ]]; do
     printf \$pid': pid still running...\n'; quiet kill \$pid && echo 'Killed pid: '\$pid; sleep 0.1;
@@ -820,7 +820,7 @@ if [[ "$TEST" == *yes* ]]; then chown root:root $nulled $pushd_log; fi;
 if [[ "$MOUNT" != "" ]]; then unmount; fi;
 if [[ -d $home/$snap_path ]]; then declare -- dir_pid="$(cat <(lsof -F p $home/$snap_path | cut -d'p' -f2 || true))"; fi;
 
-pids="$pid_0 $mk_pid $dir_pid $lsof_d $(cat $run_dir/docker.pid || printf '')"
+pids="$pid_0 $mk_pid $dir_pid $lsof_d $(cat $run_dir/docker.pid 2>> $nulled || printf '')"
 for pid in $pids; do
   while [[ $(cat <(lsof -F p -p $pid -R | grep -o $pid)) == *$pid* ]]; do
     printf $pid': pid still running...'\\n; quiet kill $pid; echo 'Killed pid: '$pid; sleep 0.1;
