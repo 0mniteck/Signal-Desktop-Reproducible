@@ -695,6 +695,7 @@ sed \"s/^/export -- /g\" $rootless_path/rootless.env > $rootless_path/tmp/rootle
 --init --feature cdi=false --cgroup-parent docker.slice --group $run_as --data-root $docker_data \
 --exec-root $run_dir/docker --pidfile $run_dir/docker.pid) | /bin/bash --norc --noprofile | \
 /bin/bash --norc --noprofile 2>> $rootless_path/rootless.log' 2>> $rootless_path/rootlesskit.log
+rm -r -f $run_dir/docker.*
 ____EOF
 
 cp -f $systemd_service $sysusr_service && wait && \
