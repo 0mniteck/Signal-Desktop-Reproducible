@@ -607,7 +607,7 @@ if [[ \"$TESTS\" != *SKIP_LOGIN* ]]; then
     git fetch --depth \$(git log --oneline | wc -l) 2>> $nulled || true; fi;
 
   confirm 'git pull - git@ssh' && echo 'Starting Git pull...'
-  git pull \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
+  git pull --ff-only \$(git remote -v | awk '{ print \$2 }' | tail -n 1) \$(git rev-parse --abbrev-ref HEAD)
 
   echo && confirm 'git submodules - git@ssh (twice)' && echo 'Starting Git submodules...'
   if [[ ! -d \".pki\" ]]; then mkdir -p .pki; git submodule add git@.pki:\$REPO/.pki.git;
