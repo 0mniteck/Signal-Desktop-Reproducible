@@ -705,7 +705,7 @@ sed -i \"s|ExecStart.*|ExecStart=/bin/env - /bin/bash -c \'$rootless_path.sh\'|\
 sed -z -i \"s|\n\[Service\]\nEnv|$(printf \"%s\\\\n\" $(echo $sed_ech))Env|\" $sysusr_service || exit 1; sys_ctl_common || true
 
 if [[ \"$DEBUG_DOCKERD\" != \"\" ]]; then
-  echo -en '\ncreated: $rootless_path.sh\n\n'
+  echo -en '\n\ncreated: $rootless_path.sh\n\n'
   cat $rootless_path.sh
   echo -en '\n\nmodified: $sysusr_service\n\n'
   cat $sysusr_service; echo
