@@ -108,7 +108,7 @@ run_id=$RUNME
 run_as=$(id -u $run_id -n)
 run_dir=/run/user/$run_id
 run_home=/home/$run_as
-term=xterm-256color
+term=xterm; lang=C.UTF-8
 
 real_date=$(date +%m-%d-%Y)
 repo=$(grep REPO= .identity | cut -d'=' -f2)
@@ -123,7 +123,7 @@ ch_grype=$(echo $cohorts | jq -r .grype[])
 
 export -- HOME=$run_home \
 TERM=$term PATH=/bin:/sbin:/snap/bin \
-TRIPL=$repo/$module:$real_date
+LANG=$lang TRIPL=$repo/$module:$real_date
 unset id; id=$(id -u)
 
 if [[ "${run_id}" == "" ]]; then
@@ -156,7 +156,7 @@ if [[ "$(uname -m)" == "aarch64" ]]; then docker_snap_ver=$arm64_ver; uname=aarc
 elif [[ "$(uname -m)" == "x86_64" ]]; then docker_snap_ver=$amd64_ver; uname=x86_64; aname=amd64; ANAME=$aname; else
   echo 'Unknown Architecture '$(uname -m); exit 1; fi;
 
-home=$HOME; path=$PATH; term=$TERM; results=results
+home=$HOME; path=$PATH; term=$TERM; lang=$LANG; results=results
 pushd_results=$(echo "pushd $results >> $pushd_log")
 popd=$(echo "popd -- >> $pushd_log")
 POPD=$(echo "popd -- >> $pushd_log"); RESULTS=$results
@@ -419,8 +419,8 @@ mkdir -p $home/.ssh && chmod 0700 $home/.ssh && \
 touch $home/.ssh/config && chmod 0644 $home/.ssh/config || exit 1
 
 export -- ANAME='$ANAME' BRANCH='$BRANCH' COMMIT='$COMMIT' CROSS='$CROSS' DBUS_SESSION_BUS_ADDRESS='unix:path=$RUN_DIR/bus' \
-EPOCH='$EPOCH' GPG_TTY=\"\$(/bin/tty)\" HOME='$HOME' INC='$INC' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' POPD='$POPD' \
-PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF=\"\$(<$HOME/.ssh/config)\" \
+EPOCH='$EPOCH' GPG_TTY=\"\$(/bin/tty)\" HOME='$HOME' INC='$INC' LANG='$LANG' MOUNT='$MOUNT' NO_AI='$NO_AI' OCI='$OCI' PATH='$PATH' \
+POPD='$POPD' PUSH='$PUSH' PUSHD_LOG='$PUSHD_LOG' PUSHD_RESULTS='$PUSHD_RESULTS' RESULTS='$RESULTS' SSH_CONF=\"\$(<$HOME/.ssh/config)\" \
 TAG='$TAG' TERM='$TERM' TEST='$TEST' TESTS='$TESTS' TRIPL='$TRIPL' XDG_RUNTIME_DIR='$RUN_DIR' || exit 1
 
 seen1=\"$seen\"; seen2=\"\$(cat <(find $cgroup_base -type d 2> /dev/null) | grep session-)\"
@@ -538,7 +538,7 @@ Host .pki
 
 drop_down() {
   set +xv; read -p 'Press enter to drop-down to the Rootless-Docker debug shell.'
-  /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; export -- HOME=$HOME PATH=\$PATH TERM=$TERM; \
+  /bin/env - /bin/bash --noprofile --rcfile <(echo cd $PWD; export -- HOME=$HOME PATH=\$PATH TERM=$TERM LANG=$LANG; \
   echo source .identity; echo source .pinned_ver; echo source $rootless_path/tmp/rootless.env; \
   echo \"echo -e '\nDropped down to interactive shell. Type exit when done, or press ctrl+d'; PS1='    $run_as@docker:~\$'; \
   PROMPT_COMMAND='echo -e \\\\\\\\nRootless~Docker:'; BUILDKIT_PROGRESS=plain;\"); $debug
@@ -661,12 +661,12 @@ touch $rootless_path.sh; if [[ \"$NO_CLEAN\" == \"\" ]]; then rm -r -f Results* 
 
 cat > $rootless_path.sh << ____EOF
 #!/bin/env -S - /bin/bash --norc --noprofile
-$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
+$debug && export -- HOME=$home PATH=$path TERM=$term LANG=$lang XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
 mkdir -p $rootless_path/tmp && > $rootless_path/docker.env && > $rootless_path/rootless.env && > $rootless_path/tmp/rootless.env
 rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run --copy-up=/sys/fs/cgroup --disable-host-loopback --ipv6 \
 --cgroupns --pidns --slirp4netns-sandbox=true --slirp4netns-seccomp=true --evacuate-cgroup2=docker.scope \
 --state-dir=$rootless_path/tmp -- /bin/bash --norc --rcfile <(echo set -m) --noprofile -i -c '
-$debug && export -- HOME=$home PATH=$path TERM=$term XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
+$debug && export -- HOME=$home PATH=$path TERM=$term LANG=$lang XDG_SESSION_ID=\$XDG_USR_SESSION && cd $PWD
 mkdir -p /sys/fs/cgroup/{$user_slice,system.slice,init.scope} && ls -laR /sys/fs/cgroup/ > $rootless_path/cgroups.ls
 env > $rootless_path/docker.env && grep ROOTLESS $rootless_path/docker.env > $rootless_path/rootless.env
 
@@ -682,6 +682,7 @@ DOCKER_HOST=unix://$run_dir/docker.sock
 DOCKER_TMPDIR=$docker_data/tmp
 GRYPE_DB_CACHE_DIR=$docker_data/grype
 HOME=$home
+LANG=$lang
 NO_COLOR=true
 PATH=$path:$docker_path:$home/docker/bin
 SOURCE_DATE_EPOCH=\$SDE
