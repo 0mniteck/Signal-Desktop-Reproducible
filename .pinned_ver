@@ -21,6 +21,6 @@ declare -- cred_helper="github.com/docker/docker-credential-helpers/releases/dow
 declare -- cred_helper_sha=085cbadca168361455d530b425304475500bc9d1a209390089bd468c2e6f3da07b483f3e3ace5f65729d6b272f6f5ad6815a0f252f72bd81587de112ebab84f9
 declare -- moby_repo=docker.io/moby/buildkit
 declare -- moby_tag=v0.29.0
-declare -- moby_src=sha256:0039c1d47e8748b5afea56f4e85f14febaf34452bd99d9552d2daa82262b5cc5
+declare -- moby_src=sha256:8550ee821375d58adc345db341b1c08df993d8411544b36fd4c6cb2dd2fb12c5
 declare -- moby=$moby_repo:$moby_tag@$moby_src
 # snap cohorts, 90 day auto-pinning, valid for v29.3.1 (4/29/2026) until (7/29/2026) -- {"cohorts":{"core24":{"cohort-key":"MSBkd1RBaDdNWlowMXp5cmlPWkVycWQxSnluUUxpT0d2TSAxNzc3NDUyMDc5IGIwOGJmZWZmNTM4ZjdmMDU0NWFjZjkxYjI0YjY3OTRiMDllZjgyY2EyNjA1YzdkNzc5NjZjMGM5MzJmOGFlZTY="},"docker":{"cohort-key":"MSBzTENzRkFPOFBLTTVaMGZBS05zelVPWDBZQVNqUWZlWiAxNzc3NDUyMDc5IGRlNDg0NzMyOWRhMTgyNjFmMGI2NDdlODM2MjhmMTVlMjJlMDljODJjZWRjODExYTlmY2ExNDcwYWMxYTcxMzc="},"grype":{"cohort-key":"MSB6RXlLcERiMG5oRUVQajJndjNuNDNjcTRKMlRxbnlRTCAxNzc3NDUyMDc5IGMyOGMwYzRmYjIwMmU3MWI1ZGE5ZmY3ZmFkZDkzMTU3ZmZkMTdjYzc5YTE3OTQ0YWRjNzg3MjAyNTRiYzM3NDI="},"syft":{"cohort-key":"MSBUSUxXMWpoc3VqOTQyUHpwbk1MR2tGUEIzVFQ2YkdsaiAxNzc3NDUyMDc5IGE5YWFmYTBkM2Y3YzQwZTZkZTA5YzdlN2NjMmRmZjY0NzA3ZjllMjRhNThlM2ZlNmJiZTEzZWE5ZjAzZWVmMmQ="}}}
