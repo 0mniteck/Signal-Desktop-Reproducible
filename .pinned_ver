@@ -1,6 +1,6 @@
-declare -- node_ver=24.14.0
-declare -- nvm_ver=0.40.4
-declare -- pnpm_ver=10.18.1
+declare -- node_ver=24.15.0
+declare -- nvm_ver=0.40.5
+declare -- pnpm_ver=11.5.2
 declare -- docker_snap_arm64_ver=3507
 declare -- docker_snap_amd64_ver=3505
 declare -- commit=abc765a83de4fa4e25e97064d96bd60d7464b1f2 # v8.9.1
